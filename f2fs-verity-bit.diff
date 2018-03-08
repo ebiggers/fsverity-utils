@@ -1,0 +1,41 @@
+diff --git a/configure.ac b/configure.ac
+index 73c830d..7733af4 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -52,8 +52,6 @@ AC_PATH_PROG([LDCONFIG], [ldconfig],
+        [$PATH:/sbin])
+ 
+ # Checks for libraries.
+-PKG_CHECK_MODULES([libuuid], [uuid])
+-
+ AS_IF([test "x$with_selinux" != "xno"],
+ 	[PKG_CHECK_MODULES([libselinux], [libselinux],
+ 	                   [have_selinux=yes], [have_selinux=no])],
+diff --git a/include/f2fs_fs.h b/include/f2fs_fs.h
+index 782c936..7184419 100644
+--- a/include/f2fs_fs.h
++++ b/include/f2fs_fs.h
+@@ -550,6 +550,7 @@ enum {
+ #define F2FS_FEATURE_INODE_CHKSUM	0x0020
+ #define F2FS_FEATURE_FLEXIBLE_INLINE_XATTR	0x0040
+ #define F2FS_FEATURE_QUOTA_INO		0x0080
++#define F2FS_FEATURE_VERITY                     0x0200
+ 
+ #define MAX_VOLUME_NAME		512
+ 
+diff --git a/mkfs/f2fs_format_main.c b/mkfs/f2fs_format_main.c
+index e41bcb1..15de5fe 100644
+--- a/mkfs/f2fs_format_main.c
++++ b/mkfs/f2fs_format_main.c
+@@ -80,7 +80,10 @@ static void parse_feature(const char *features)
+ {
+ 	while (*features == ' ')
+ 		features++;
+-	if (!strcmp(features, "encrypt")) {
++	if (!strcmp(features, "verity")) {
++		MSG(0, "Info: Setting verity\n");
++		c.feature |= cpu_to_le32(F2FS_FEATURE_VERITY);
++	} else if (!strcmp(features, "encrypt")) {
+ 		c.feature |= cpu_to_le32(F2FS_FEATURE_ENCRYPT);
+ 	} else if (!strcmp(features, "extra_attr")) {
+ 		c.feature |= cpu_to_le32(F2FS_FEATURE_EXTRA_ATTR);
