@@ -1,48 +1,92 @@
-#!/bin/sh
+#!/bin/bash
 
-set -x
+set -eu
 
-OPTIND=1
-patch=0
-patch_offset=28672
-patch_length=128
-elide=0
-elide_offset=12288
-elid_length=8192
-size=36864
-keep_input=0
-while getopts "poeskf:" opt; do
-    case "$opt" in
-	p)  patch=1
-	    ;;
-	o)  patch_offset=$OPTARG
-	    ;;
-	e)  elide=1
-	    ;;
-	f)  elide_offset=$OPTARG
-	    ;;
-	s)  size=$OPTARG
-	    ;;
-	k)  keep_input=1
-	    ;;
-    esac
-done
-shift $((OPTIND-1))
-[ "$1" = "--" ] && shift
-filename="input-$size.apk"
-backup_filename="input-$size-backup.apk"
-patch_filename="output-$size-patch"
-echo "size=$size, filename='$filename', patch_filename='$patch_filename', patch=$patch, patch_offset=$patch_offset, elide=$elide, unparsed: $@"
-num_blks=$(($size / 4096))
-blk_aligned_sz=$(($num_blks*4096))
-echo "Number of blocks: $num_blks"
-if [ $keep_input -eq 0 ]; then
-    remainder=$(($size % 4096))
-    echo "Remainder: $remainder"
-    dd if=/dev/urandom of=$filename bs=4096 count=$num_blks
-    dd if=/dev/urandom of=$filename bs=1 count=$remainder seek=$blk_aligned_sz
+SIZE=36864
+KEEP_INPUT=false
+PATCHES=()
+ELISIONS=()
+
+usage() {
+	cat << EOF
+Usage: $0 [OPTIONS]
+
+Test formatting a randomly generated file for fs-verity.
+
+Options:
+  -s, --size=SIZE
+  -k, --keep-input
+  -p, --patch=OFFSET,LENGTH [can be repeated]
+  -e, --elide=OFFSET,LENGTH [can be repeated]
+  -h, --help
+EOF
+}
+
+if ! options=$(getopt -o s:kp:e:h \
+	-l size:,keep-input,patch:,elide:,help -- "$@"); then
+	usage 1>&2
+	exit 2
 fi
-dd if=/dev/urandom of=$patch_filename bs=1 count=$patch_length
-if [ $elide -eq 1 ]; then ELIDE_ARGS=" --elide_offset=${elide_offset} --elide_length=${elide_length}"; fi
-if [ $patch -eq 1 ]; then PATCH_ARGS=" --patch_offset=${patch_offset} --patch_file=${patch_filename}"; fi
-./fsverity.py $filename "output-$size.apk" --salt=deadbeef00000000 ${PATCH_ARGS} ${ELIDE_ARGS}
+
+eval set -- "$options"
+
+while (( $# > 0 )); do
+	case "$1" in
+	-s|--size)
+		SIZE="$2"
+		shift
+		;;
+	-k|--keep-input)
+		KEEP_INPUT=true
+		;;
+	-p|--patch)
+		PATCHES+=("$2")
+		shift
+		;;
+	-e|--elide)
+		ELISIONS+=("$2")
+		shift
+		;;
+	-h|--help)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		echo 1>&2 "Invalid option \"$1\""
+		usage 1>&2
+		exit 2
+		;;
+	esac
+	shift
+done
+
+if (( $# != 0 )); then
+	usage 1>&2
+	exit 2
+fi
+
+filename="input-$SIZE.apk"
+
+if ! $KEEP_INPUT; then
+    head -c "$SIZE" /dev/urandom > "$filename"
+fi
+
+cmd=(./fsveritysetup.py "$filename" "output-$SIZE.apk")
+cmd+=("--salt=deadbeef00000000")
+
+for i in "${!PATCHES[@]}"; do
+	patch_offset=$(echo "${PATCHES[$i]}" | cut -d, -f1)
+	patch_length=$(echo "${PATCHES[$i]}" | cut -d, -f2)
+	patch_filename="output-$SIZE-patch_$i"
+	head -c "$patch_length" /dev/urandom > "$patch_filename"
+	cmd+=("--patch=$patch_offset,$patch_filename")
+done
+
+cmd+=("${ELISIONS[@]/#/--elide=}")
+
+echo "${cmd[@]}"
+"${cmd[@]}"
