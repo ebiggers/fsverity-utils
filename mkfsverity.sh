@@ -88,5 +88,9 @@ done
 
 cmd+=("${ELISIONS[@]/#/--elide=}")
 
-echo "${cmd[@]}"
-"${cmd[@]}"
+TORUN="${cmd[@]}"
+OUTPUT="$($TORUN)"
+MEASUREMENT=`echo ${OUTPUT} | grep -o -w -E '[[:alnum:]]{64}' | sed -n 2p`
+echo "#!/bin/sh" > ${SIZE}.sh
+echo "./full-run-fsverity.sh ${SIZE} ${MEASUREMENT}" >> ${SIZE}.sh
+chmod 755 ${SIZE}.sh

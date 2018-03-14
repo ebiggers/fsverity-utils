@@ -7,7 +7,7 @@ dd if=/dev/zero of=/root/f2fs.img seek=$(($1<16384000?128000:$1/128)) bs=512 cou
 mount -o loop /root/f2fs.img /mnt/f2fs
 cp /root/output-$1.apk /mnt/f2fs/output-$1.apk
 make
-./fsverityset /mnt/f2fs/output-$1.apk $1
+./fsverityset /mnt/f2fs/output-$1.apk
 ./fsveritymeasure /mnt/f2fs/output-$1.apk $2
 sync
 echo 3 > /proc/sys/vm/drop_caches

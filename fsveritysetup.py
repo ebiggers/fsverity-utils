@@ -393,7 +393,7 @@ class FSVerityGenerator(object):
 
         # Finish the output file by writing the header offset field.
         hdr_offset = HeaderOffset()
-        hdr_offset.hdr_offset = len(header) + len(extensions)
+        hdr_offset.hdr_offset = len(header) + len(extensions) + ctypes.sizeof(hdr_offset)
         outfile.write(serialize_struct(hdr_offset))
 
         # Compute the fs-verity measurement.
