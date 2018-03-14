@@ -53,8 +53,6 @@ class fsverity_extension(ctypes.LittleEndianStructure):
 class fsverity_extension_patch(ctypes.LittleEndianStructure):
   _fields_ = [
       ('offset', ctypes.c_uint64),  #
-      ('length', ctypes.c_uint8),
-      ('reserved', ctypes.c_char * 7)
       # followed by variable-length 'databytes'
   ]
 
@@ -161,7 +159,7 @@ class Extension(object):
     type_buf = self._serialize_impl()
     hdr = fsverity_extension()
     pad = -len(type_buf) % 8
-    hdr.length = ctypes.sizeof(hdr) + len(type_buf) + pad
+    hdr.length = ctypes.sizeof(hdr) + len(type_buf)
     hdr.type = self.TYPE_CODE
     return serialize_struct(hdr) + type_buf + (b'\0' * pad)
 
@@ -207,7 +205,6 @@ class PatchExtension(Extension):
   def _serialize_impl(self):
     ext = fsverity_extension_patch()
     ext.offset = self.offset
-    ext.length = self.length
     return serialize_struct(ext) + self.data
 
 
@@ -393,7 +390,8 @@ class FSVerityGenerator(object):
 
         # Finish the output file by writing the header offset field.
         hdr_offset = HeaderOffset()
-        hdr_offset.hdr_offset = len(header) + len(extensions) + ctypes.sizeof(hdr_offset)
+        hdr_offset.hdr_offset = len(header) + len(extensions) + ctypes.sizeof(
+            hdr_offset)
         outfile.write(serialize_struct(hdr_offset))
 
         # Compute the fs-verity measurement.
