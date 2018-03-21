@@ -222,8 +222,6 @@ class FSVerityGenerator(object):
     self.salt = salt
     assert len(salt) == FS_VERITY_SALT_SIZE
 
-    self.tree_filename = kwargs.get('tree_filename')
-
     self.extensions = kwargs.get('extensions')
     if self.extensions is None:
       self.extensions = []
@@ -294,13 +292,9 @@ class FSVerityGenerator(object):
     with open(data_filename, 'ab') as f:
       pad_to_block_boundary(f)
 
-    # Choose the file to which we'll output the Merkle tree: either an
-    # explicitly specified one or a temporary one.
-    if self.tree_filename is not None:
-      tree_filename = self.tree_filename
-    else:
-      with self._open_tmpfile('wb') as f:
-        tree_filename = f.name
+    # File to which we'll output the Merkle tree
+    with self._open_tmpfile('wb') as f:
+      tree_filename = f.name
 
     if self.builtin_veritysetup:
       root_hash = veritysetup(data_filename, tree_filename, self.salt)
@@ -469,12 +463,6 @@ def parse_args():
       help='{}-byte salt, given as a {}-character hex string'.format(
           FS_VERITY_SALT_SIZE, FS_VERITY_SALT_SIZE * 2))
   parser.add_argument(
-      '--tree-file',
-      metavar='<tree_file>',
-      dest='tree_filename',
-      type=str,
-      help='File to which to output the raw Merkle tree (optional)')
-  parser.add_argument(
       '--patch',
       metavar='<offset,patchfile>',
       type=convert_patch_argument,
@@ -511,7 +499,6 @@ def main():
         args.in_filename,
         args.out_filename,
         args.salt,
-        tree_filename=args.tree_filename,
         extensions=args.extensions,
         builtin_veritysetup=args.builtin_veritysetup)
   except BadExtensionListError as e:
