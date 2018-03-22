@@ -1,5 +1,5 @@
-#ifndef _FSVERITY_KERNEL_DEFS_H
-#define _FSVERITY_KERNEL_DEFS_H
+#ifndef _FSVERITY_API_H
+#define _FSVERITY_API_H
 
 #include <linux/limits.h>
 #include <linux/ioctl.h>
@@ -7,38 +7,18 @@
 
 /* file-based verity support */
 
-/*
- * TODO(ebiggers):  What is the purpose of this structure?  It's not actually
- * used for anything.
- */
-struct fsverity_set {
-	__u64 offset;
-	__u64 flags;
+#define FS_VERITY_ALG_SHA256	1
+#define FS_VERITY_ALG_CRC32	2
+
+struct fsverity_measurement {
+	__u16 digest_algorithm;
+	__u16 digest_size;
+	__u32 reserved1;
+	__u64 reserved2[3];
+	__u8 digest[];
 };
 
-/*
- * TODO(ebiggers): why isn't this using the same type code as used in the
- * fsverity_header?
- */
-#define FS_VERITY_ROOT_HASH_ALGO_SHA256	0x0000
+#define FS_IOC_ENABLE_VERITY		_IO('f', 133)
+#define FS_IOC_SET_VERITY_MEASUREMENT	_IOW('f', 134, struct fsverity_measurement)
 
-/*
- * TODO(ebiggers): rename this to 'struct fsverity_measurement' to avoid
- * confusion with the Merkle tree root hash?
- */
-struct fsverity_root_hash {
-	__u32 root_hash_algorithm;
-	__u32 flags;
-	__u8 reserved[4];
-	__u8 root_hash[64];
-};
-
-/*
- * TODO(ebiggers): is there a less confusing name for this?  "measure" makes it
- * sound like it's returning something...
- */
-#define FS_IOC_MEASURE_FSVERITY		_IOW('f', 133, \
-					      struct fsverity_root_hash)
-#define FS_IOC_SET_FSVERITY		_IOW('f', 134, struct fsverity_set)
-
-#endif /* _FSVERITY_KERNEL_DEFS_H */
+#endif /* _FSVERITY_API_H */

@@ -1,5 +1,5 @@
 CFLAGS := -O2 -Wall
-EXE := fsverityset fsveritymeasure
+EXE := fsverity
 
 all:$(EXE)
 

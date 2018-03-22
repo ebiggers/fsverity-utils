@@ -21,8 +21,8 @@ FS_VERITY_MAGIC = b'TrueBrew'
 FS_VERITY_SALT_SIZE = 8
 FS_VERITY_EXT_ELIDE = 0
 FS_VERITY_EXT_PATCH = 1
-FS_VERITY_ALG_CRC32 = 0
 FS_VERITY_ALG_SHA256 = 1
+FS_VERITY_ALG_CRC32 = 2
 
 
 class CRC32Hash(object):
@@ -68,8 +68,8 @@ class HashAlgorithm(object):
 
 
 HASH_ALGORITHMS = [
-    HashAlgorithm(FS_VERITY_ALG_CRC32, 'crc32', 4),
     HashAlgorithm(FS_VERITY_ALG_SHA256, 'sha256', 32),
+    HashAlgorithm(FS_VERITY_ALG_CRC32, 'crc32', 4),
 ]
 
 
