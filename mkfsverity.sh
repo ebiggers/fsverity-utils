@@ -75,7 +75,7 @@ if ! $KEEP_INPUT; then
     head -c "$SIZE" /dev/urandom > "$filename"
 fi
 
-cmd=(./fsveritysetup.py "$filename" "output-$SIZE.apk")
+cmd=(./fsveritysetup "$filename" "output-$SIZE.apk")
 cmd+=("--salt=deadbeef00000000")
 
 for i in "${!PATCHES[@]}"; do
