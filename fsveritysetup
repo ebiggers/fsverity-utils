@@ -73,7 +73,7 @@ HASH_ALGORITHMS = [
 ]
 
 
-class fsverity_header(ctypes.LittleEndianStructure):
+class fsverity_footer(ctypes.LittleEndianStructure):
   _fields_ = [
       ('magic', ctypes.c_char * 8),  #
       ('maj_version', ctypes.c_uint8),
@@ -114,8 +114,8 @@ class fsverity_extension_elide(ctypes.LittleEndianStructure):
   ]
 
 
-class HeaderOffset(ctypes.LittleEndianStructure):
-  _fields_ = [('hdr_offset', ctypes.c_uint32)]
+class FooterOffset(ctypes.LittleEndianStructure):
+  _fields_ = [('ftr_offset', ctypes.c_uint32)]
 
 
 def copy_bytes(src, dst, n):
@@ -376,21 +376,21 @@ class FSVerityGenerator(object):
         raise OSError('Root hash not found in veritysetup output!')
     return root_hash, tree_filename
 
-  def _generate_header(self):
-    """Generates the fs-verity header."""
-    header = fsverity_header()
-    assert ctypes.sizeof(header) == 64
-    header.magic = FS_VERITY_MAGIC
-    header.maj_version = 1
-    header.min_version = 0
-    header.log_blocksize = ilog2(DATA_BLOCK_SIZE)
-    header.log_arity = ilog2(DATA_BLOCK_SIZE / self.algorithm.digest_size)
-    header.meta_algorithm = self.algorithm.code
-    header.data_algorithm = self.algorithm.code
-    header.size = self.original_size
-    header.extension_count = len(self.extensions)
-    header.salt = self.salt
-    return serialize_struct(header)
+  def _generate_footer(self):
+    """Generates the fixed-size portion of the fs-verity footer."""
+    footer = fsverity_footer()
+    assert ctypes.sizeof(footer) == 64
+    footer.magic = FS_VERITY_MAGIC
+    footer.maj_version = 1
+    footer.min_version = 0
+    footer.log_blocksize = ilog2(DATA_BLOCK_SIZE)
+    footer.log_arity = ilog2(DATA_BLOCK_SIZE / self.algorithm.digest_size)
+    footer.meta_algorithm = self.algorithm.code
+    footer.data_algorithm = self.algorithm.code
+    footer.size = self.original_size
+    footer.extension_count = len(self.extensions)
+    footer.salt = self.salt
+    return serialize_struct(footer)
 
   def generate(self):
     """Sets up a file for fs-verity.
@@ -423,9 +423,9 @@ class FSVerityGenerator(object):
         with open(tree_filename, 'rb') as treefile:
           copy(treefile, outfile)
 
-        # Append the fs-verity header.
-        header = self._generate_header()
-        outfile.write(header)
+        # Append the fixed-size portion of the fs-verity footer.
+        footer = self._generate_footer()
+        outfile.write(footer)
 
         # Append extension items, if any.
         extensions = bytearray()
@@ -433,15 +433,15 @@ class FSVerityGenerator(object):
           extensions += ext.serialize()
         outfile.write(extensions)
 
-        # Finish the output file by writing the header offset field.
-        hdr_offset = HeaderOffset()
-        hdr_offset.hdr_offset = len(header) + len(extensions) + ctypes.sizeof(
-            hdr_offset)
-        outfile.write(serialize_struct(hdr_offset))
+        # Finish the output file by writing the footer offset field.
+        ftr_offset = FooterOffset()
+        ftr_offset.ftr_offset = len(footer) + len(extensions) + ctypes.sizeof(
+            ftr_offset)
+        outfile.write(serialize_struct(ftr_offset))
 
         # Compute the fs-verity measurement.
         measurement = self.algorithm.create()
-        measurement.update(header)
+        measurement.update(footer)
         measurement.update(extensions)
         measurement.update(binascii.unhexlify(root_hash))
         measurement = measurement.hexdigest()
