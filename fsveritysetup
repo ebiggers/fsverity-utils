@@ -19,8 +19,8 @@ DATA_BLOCK_SIZE = 4096
 HASH_BLOCK_SIZE = 4096
 FS_VERITY_MAGIC = b'TrueBrew'
 FS_VERITY_SALT_SIZE = 8
-FS_VERITY_EXT_ELIDE = 0
-FS_VERITY_EXT_PATCH = 1
+FS_VERITY_EXT_ELIDE = 1
+FS_VERITY_EXT_PATCH = 2
 FS_VERITY_ALG_SHA256 = 1
 FS_VERITY_ALG_CRC32 = 2
 
@@ -85,8 +85,8 @@ class fsverity_footer(ctypes.LittleEndianStructure):
       ('flags', ctypes.c_uint32),
       ('reserved1', ctypes.c_uint32),
       ('size', ctypes.c_uint64),
-      ('auth_blk_offset', ctypes.c_uint8),
-      ('extension_count', ctypes.c_uint8),
+      ('authenticated_ext_count', ctypes.c_uint8),
+      ('unauthenticated_ext_count', ctypes.c_uint8),
       ('salt', ctypes.c_char * FS_VERITY_SALT_SIZE),
       ('reserved2', ctypes.c_char * 22)
   ]
@@ -94,9 +94,9 @@ class fsverity_footer(ctypes.LittleEndianStructure):
 
 class fsverity_extension(ctypes.LittleEndianStructure):
   _fields_ = [
-      ('length', ctypes.c_uint16),  #
-      ('type', ctypes.c_uint8),
-      ('reserved', ctypes.c_char * 5)
+      ('length', ctypes.c_uint32),  #
+      ('type', ctypes.c_uint16),
+      ('reserved', ctypes.c_uint16)
   ]
 
 
@@ -388,7 +388,7 @@ class FSVerityGenerator(object):
     footer.meta_algorithm = self.algorithm.code
     footer.data_algorithm = self.algorithm.code
     footer.size = self.original_size
-    footer.extension_count = len(self.extensions)
+    footer.authenticated_ext_count = len(self.extensions)
     footer.salt = self.salt
     return serialize_struct(footer)
 
