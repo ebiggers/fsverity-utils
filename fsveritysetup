@@ -315,9 +315,9 @@ class FSVerityGenerator(object):
     if self.patches_and_elisions is None:
       self.patches_and_elisions = []
 
-    self.builtin_veritysetup = kwargs.get('builtin_veritysetup')
-    if self.builtin_veritysetup is None:
-      self.builtin_veritysetup = False
+    self.external_veritysetup = kwargs.get('external_veritysetup')
+    if self.external_veritysetup is None:
+      self.external_veritysetup = False
 
     self.signing_key_file = kwargs.get('signing_key_file')
     self.signature_file = kwargs.get('signature_file')
@@ -390,10 +390,7 @@ class FSVerityGenerator(object):
     with self._open_tmpfile('wb') as f:
       tree_filename = f.name
 
-    if self.builtin_veritysetup:
-      root_hash = veritysetup(data_filename, tree_filename, self.salt,
-                              self.algorithm)
-    else:
+    if self.external_veritysetup:
       # Delegate to 'veritysetup' to actually build the Merkle tree.
       cmd = [
           'veritysetup',
@@ -417,6 +414,9 @@ class FSVerityGenerator(object):
           break
       if root_hash is None:
         raise OSError('Root hash not found in veritysetup output!')
+    else: # builtin veritysetup
+      root_hash = veritysetup(data_filename, tree_filename, self.salt,
+                              self.algorithm)
     return root_hash, tree_filename
 
   def _generate_footer(self):
@@ -658,11 +658,11 @@ def parse_args():
       beginning at <offset> in the original file and continuing for <length>
       bytes will not be verified.""")
   parser.add_argument(
-      '--builtin-veritysetup',
+      '--external-veritysetup',
       action='store_const',
       const=True,
-      help="""Use the built-in Merkle tree generation algorithm rather than
-      invoking the external veritysetup program.  They should produce the same
+      help="""Invoke the external veritysetup program rather than using the
+      built-in Merkle tree generation algorithm.  They should produce the same
       result.""")
   parser.add_argument(
       '--signing-key',
@@ -687,7 +687,7 @@ def main():
         args.hash,
         salt=args.salt,
         patches_and_elisions=args.patches_and_elisions,
-        builtin_veritysetup=args.builtin_veritysetup,
+        external_veritysetup=args.external_veritysetup,
         signing_key_file=args.signing_key,
         signature_file=args.signature)
   except BadPatchOrElisionError as e:
