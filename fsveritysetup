@@ -18,7 +18,6 @@ import zlib
 DATA_BLOCK_SIZE = 4096
 HASH_BLOCK_SIZE = 4096
 FS_VERITY_MAGIC = b'TrueBrew'
-FS_VERITY_SALT_SIZE = 8
 
 FS_VERITY_EXT_ELIDE = 1
 FS_VERITY_EXT_PATCH = 2
@@ -92,8 +91,7 @@ class fsverity_footer(ctypes.LittleEndianStructure):
       ('size', ctypes.c_uint64),
       ('authenticated_ext_count', ctypes.c_uint8),
       ('unauthenticated_ext_count', ctypes.c_uint8),
-      ('salt', ctypes.c_char * FS_VERITY_SALT_SIZE),
-      ('reserved2', ctypes.c_char * 22)
+      ('reserved2', ctypes.c_char * 30)
   ]
 
 
@@ -217,15 +215,23 @@ class Extension(object):
     return serialize_struct(hdr) + type_buf + (b'\0' * pad)
 
 
-class PKCS7SignatureExtension(Extension):
+class SimpleExtension(Extension):
 
-  TYPE_CODE = FS_VERITY_EXT_PKCS7_SIGNATURE
-
-  def __init__(self, pkcs7_msg):
-    self.pkcs7_msg = pkcs7_msg
+  def __init__(self, raw_data):
+    self.raw_data = raw_data
 
   def _serialize_impl(self):
-    return self.pkcs7_msg
+    return self.raw_data
+
+
+class SaltExtension(SimpleExtension):
+
+  TYPE_CODE = FS_VERITY_EXT_SALT
+
+
+class PKCS7SignatureExtension(SimpleExtension):
+
+  TYPE_CODE = FS_VERITY_EXT_PKCS7_SIGNATURE
 
 
 class DataExtension(Extension):
@@ -288,24 +294,26 @@ class PatchExtension(DataExtension):
     return serialize_struct(ext) + self.data
 
 
-class BadExtensionListError(Exception):
+class BadPatchOrElisionError(Exception):
   pass
 
 
 class FSVerityGenerator(object):
   """Sets up a file for fs-verity."""
 
-  def __init__(self, in_filename, out_filename, salt, algorithm, **kwargs):
+  def __init__(self, in_filename, out_filename, algorithm, **kwargs):
     self.in_filename = in_filename
     self.original_size = os.stat(in_filename).st_size
     self.out_filename = out_filename
-    self.salt = salt
     self.algorithm = algorithm
-    assert len(salt) == FS_VERITY_SALT_SIZE
 
-    self.patch_elide_exts = kwargs.get('patch_elide_exts')
-    if self.patch_elide_exts is None:
-      self.patch_elide_exts = []
+    self.salt = kwargs.get('salt')
+    if self.salt is None:
+      self.salt = bytes()
+
+    self.patches_and_elisions = kwargs.get('patches_and_elisions')
+    if self.patches_and_elisions is None:
+      self.patches_and_elisions = []
 
     self.builtin_veritysetup = kwargs.get('builtin_veritysetup')
     if self.builtin_veritysetup is None:
@@ -317,17 +325,17 @@ class FSVerityGenerator(object):
     self.tmp_filenames = []
 
     # Patches and elisions must be within the file size and must not overlap.
-    self.patch_elide_exts = sorted(
-        self.patch_elide_exts, key=lambda ext: ext.offset)
-    for i, ext in enumerate(self.patch_elide_exts):
+    self.patches_and_elisions = sorted(
+        self.patches_and_elisions, key=lambda ext: ext.offset)
+    for i, ext in enumerate(self.patches_and_elisions):
       ext_end = ext.offset + ext.length
       if ext_end > self.original_size:
-        raise BadExtensionListError(
+        raise BadPatchOrElisionError(
             '{} extends beyond end of file!'.format(ext))
-      if i + 1 < len(self.patch_elide_exts
-                    ) and ext_end > self.patch_elide_exts[i + 1].offset:
-        raise BadExtensionListError('{} overlaps {}!'.format(
-            ext, self.patch_elide_exts[i + 1]))
+      if i + 1 < len(self.patches_and_elisions
+                    ) and ext_end > self.patches_and_elisions[i + 1].offset:
+        raise BadPatchOrElisionError('{} overlaps {}!'.format(
+            ext, self.patches_and_elisions[i + 1]))
 
   def _open_tmpfile(self, mode):
     f = tempfile.NamedTemporaryFile(mode, delete=False)
@@ -343,7 +351,7 @@ class FSVerityGenerator(object):
     with open(data_filename, 'rb') as src:
       with self._open_tmpfile('wb') as dst:
         src_pos = 0
-        for ext in self.patch_elide_exts:
+        for ext in self.patches_and_elisions:
           print('Applying {}'.format(ext))
           copy_bytes(src, dst, ext.offset - src_pos)
           ext.apply(dst)
@@ -369,7 +377,7 @@ class FSVerityGenerator(object):
 
     # If there are any patch or elide extensions, apply them to a temporary file
     # and use that to build the Merkle tree instead of the original data.
-    if self.patch_elide_exts:
+    if self.patches_and_elisions:
       data_filename = self._apply_patch_elide_extensions(data_filename)
 
     # Pad to a data block boundary before building the Merkle tree.
@@ -423,7 +431,9 @@ class FSVerityGenerator(object):
     footer.meta_algorithm = self.algorithm.code
     footer.data_algorithm = self.algorithm.code
     footer.size = self.original_size
-    footer.authenticated_ext_count = len(self.patch_elide_exts)
+    footer.authenticated_ext_count = len(self.patches_and_elisions)
+    if self.salt:
+      footer.authenticated_ext_count += 1
     footer.unauthenticated_ext_count = 0
     if self.signing_key_file or self.signature_file:
       footer.unauthenticated_ext_count += 1
@@ -509,8 +519,10 @@ class FSVerityGenerator(object):
 
         # Generate authenticated extension items, if any.
         auth_extensions = bytearray()
-        for ext in self.patch_elide_exts:
+        for ext in self.patches_and_elisions:
           auth_extensions += ext.serialize()
+        if self.salt:
+          auth_extensions += SaltExtension(self.salt).serialize()
 
         # Compute the fs-verity measurement.
         measurement = self.algorithm.create()
@@ -562,13 +574,10 @@ def convert_hash_argument(argstring):
 
 def convert_salt_argument(argstring):
   try:
-    b = binascii.unhexlify(argstring)
-    if len(b) != FS_VERITY_SALT_SIZE:
-      raise ValueError
-    return b
+    return binascii.unhexlify(argstring)
   except (ValueError, TypeError):
     raise argparse.ArgumentTypeError(
-        'Must be a 16-character hex string.  (Got "{}")'.format(argstring))
+        'Must be a hex string.  (Got "{}")'.format(argstring))
 
 
 def convert_patch_argument(argstring):
@@ -621,9 +630,7 @@ def parse_args():
       '--salt',
       metavar='<hex_string>',
       type=convert_salt_argument,
-      default='00' * FS_VERITY_SALT_SIZE,
-      help='{}-byte salt, given as a {}-character hex string'.format(
-          FS_VERITY_SALT_SIZE, FS_VERITY_SALT_SIZE * 2))
+      help='Salt, given as a hex string.  Default is no salt.')
   parser.add_argument(
       '--hash',
       type=convert_hash_argument,
@@ -635,7 +642,7 @@ def parse_args():
       metavar='<offset,patchfile>',
       type=convert_patch_argument,
       action='append',
-      dest='patch_elide_exts',
+      dest='patches_and_elisions',
       help="""Add a patch extension (not recommended).  Data in the region
       beginning at <offset> in the original file and continuing for
       filesize(<patchfile>) bytes will be replaced with the contents of
@@ -646,7 +653,7 @@ def parse_args():
       metavar='<offset,length>',
       type=convert_elide_argument,
       action='append',
-      dest='patch_elide_exts',
+      dest='patches_and_elisions',
       help="""Add an elide extension (not recommended).  Data in the region
       beginning at <offset> in the original file and continuing for <length>
       bytes will not be verified.""")
@@ -677,13 +684,13 @@ def main():
     generator = FSVerityGenerator(
         args.in_filename,
         args.out_filename,
-        args.salt,
         args.hash,
-        patch_elide_exts=args.patch_elide_exts,
+        salt=args.salt,
+        patches_and_elisions=args.patches_and_elisions,
         builtin_veritysetup=args.builtin_veritysetup,
         signing_key_file=args.signing_key,
         signature_file=args.signature)
-  except BadExtensionListError as e:
+  except BadPatchOrElisionError as e:
     sys.stderr.write('ERROR: {}\n'.format(e))
     sys.exit(1)
 
