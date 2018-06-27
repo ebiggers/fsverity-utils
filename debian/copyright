@@ -4,4 +4,4 @@ Source: git://git.kernel.org/pub/scm/linux/kernel/git/mhalcrow/fsverity
 
 Files: *
 Copyright: 2018 Google, Inc
-License: GPL-2
+License: GPL-2+

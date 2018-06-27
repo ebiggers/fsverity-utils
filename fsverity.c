@@ -1,204 +1,148 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * fs-verity userspace tool
  *
- * Copyright (C) 2018, Google, Inc.
+ * Copyright (C) 2018 Google, Inc.
+ *
+ * Written by Eric Biggers, 2018.
  */
 
-#include <fcntl.h>
-#include <getopt.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
 
-#include "fsverity_api.h"
+#include "commands.h"
+#include "hash_algs.h"
 
-#define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
-
-static const struct fsverity_hash_alg {
+static const struct fsverity_command {
 	const char *name;
-	int digest_size;
-} fsverity_hash_algs[] = {
-	[FS_VERITY_ALG_SHA256] = {
-		.name = "sha256",
-		.digest_size = 32,
-	},
-	[FS_VERITY_ALG_CRC32] = {
-		.name = "crc32",
-		.digest_size = 4,
+	int (*func)(const struct fsverity_command *cmd, int argc, char *argv[]);
+	const char *short_desc;
+	const char *usage_str;
+} fsverity_commands[] = {
+	{
+		.name = "enable",
+		.func = fsverity_cmd_enable,
+		.short_desc =
+"Enable fs-verity on a file with verity metadata",
+		.usage_str =
+"    fsverity enable FILE\n"
+	}, {
+		.name = "setup",
+		.func = fsverity_cmd_setup,
+		.short_desc = "Create the verity metadata for a file",
+		.usage_str =
+"    fsverity setup INFILE [OUTFILE]\n"
+"                   [--hash=HASH_ALG] [--salt=SALT] [--signing-key=KEYFILE]\n"
+"                   [--signing-cert=CERTFILE] [--signature=SIGFILE]\n"
+"                   [--patch=OFFSET,PATCHFILE] [--elide=OFFSET,LENGTH]\n"
+	}, {
+		.name = "set_measurement",
+		.func = fsverity_cmd_set_measurement,
+		.short_desc =
+"Set the trusted file measurement for the given fs-verity file",
+		.usage_str =
+"    fsverity set_measurement FILE EXPECTED_MEASUREMENT [--hash=HASH_ALG]\n"
 	},
 };
 
-static void show_hash_algs(void)
+static void usage_all(FILE *fp)
 {
-	size_t i;
+	int i;
 
-	fprintf(stderr, "Available hash algorithms:");
-	for (i = 0; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
-		if (fsverity_hash_algs[i].name)
-			fprintf(stderr, " %s", fsverity_hash_algs[i].name);
-	}
-	fprintf(stderr, "\n");
+	fputs("Usage:\n", fp);
+	for (i = 0; i < ARRAY_SIZE(fsverity_commands); i++)
+		fprintf(fp, "  %s:\n%s\n", fsverity_commands[i].short_desc,
+			fsverity_commands[i].usage_str);
+	fputs(
+"  Standard options:\n"
+"    fsverity --help\n"
+"    fsverity --version\n"
+"\n"
+"Available hash algorithms: ", fp);
+	show_all_hash_algs(fp);
+	fputs("\nSee `man fsverity` for more details.\n", fp);
 }
 
-static const struct fsverity_hash_alg *find_hash_alg(const char *name)
+static void usage_cmd(const struct fsverity_command *cmd, FILE *fp)
 {
-	size_t i;
+	fprintf(fp, "Usage:\n%s", cmd->usage_str);
+}
 
-	for (i = 0; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
-		if (fsverity_hash_algs[i].name &&
-		    !strcmp(name, fsverity_hash_algs[i].name))
-			return &fsverity_hash_algs[i];
+void usage(const struct fsverity_command *cmd, FILE *fp)
+{
+	if (cmd)
+		usage_cmd(cmd, fp);
+	else
+		usage_all(fp);
+}
+
+#define PACKAGE_VERSION    "v0.0-alpha"
+#define PACKAGE_BUGREPORT  "linux-fscrypt@vger.kernel.org"
+
+static void show_version(void)
+{
+	static const char * const str =
+"fsverity " PACKAGE_VERSION "\n"
+"Copyright (C) 2018 Google, Inc.\n"
+"License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl.html>.\n"
+"This is free software: you are free to change and redistribute it.\n"
+"There is NO WARRANTY, to the extent permitted by law.\n"
+"\n"
+"Report bugs to " PACKAGE_BUGREPORT ".\n";
+	fputs(str, stdout);
+}
+
+static void handle_common_options(int argc, char *argv[],
+				  const struct fsverity_command *cmd)
+{
+	int i;
+
+	for (i = 1; i < argc; i++) {
+		const char *arg = argv[i];
+
+		if (*arg++ != '-')
+			continue;
+		if (*arg++ != '-')
+			continue;
+		if (!strcmp(arg, "help")) {
+			usage(cmd, stdout);
+			exit(0);
+		} else if (!strcmp(arg, "version")) {
+			show_version();
+			exit(0);
+		} else if (!*arg) /* reached "--", no more options */
+			return;
 	}
+}
+
+static const struct fsverity_command *find_command(const char *name)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(fsverity_commands); i++)
+		if (!strcmp(name, fsverity_commands[i].name))
+			return &fsverity_commands[i];
 	return NULL;
 }
 
-static int hex2bin_char(char c)
+int main(int argc, char *argv[])
 {
-	if (c >= 'a' && c <= 'f')
-		return 10 + c - 'a';
-	if (c >= 'A' && c <= 'F')
-		return 10 + c - 'A';
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	return -1;
-}
+	const struct fsverity_command *cmd;
 
-static bool parse_hex_digest(const char *hex, __u8 *bin, size_t bin_len)
-{
-	size_t i;
-
-	if (strlen(hex) != 2 * bin_len)
-		return false;
-
-	for (i = 0; i < bin_len; i++) {
-		int hi = hex2bin_char(hex[i * 2]);
-		int lo = hex2bin_char(hex[i * 2 + 1]);
-
-		if (hi < 0 || lo < 0)
-			return false;
-		bin[i] = (hi << 4) | lo;
-	}
-	return true;
-}
-
-enum {
-	OPT_HASH,
-};
-
-static void usage(void)
-{
-	const char * const usage_str =
-"Usage: fsverity enable FILE\n"
-"       fsverity set_measurement [--hash=HASH] FILE EXPECTED_MEASUREMENT\n"
-"\n"
-"EXPECTED_MEASUREMENT must be given as a hex string.\n"
-"The default HASH algorithm is sha256.\n"
-	;
-	fputs(usage_str, stderr);
-	show_hash_algs();
-	exit(2);
-}
-
-static int fsverity_enable(int argc, char *argv[])
-{
-	int fd;
-
-	if (argc != 2)
-		usage();
-
-	fd = open(argv[1], O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Can't open %s: %m\n", argv[1]);
-		return 1;
-	}
-	if (ioctl(fd, FS_IOC_ENABLE_VERITY, NULL)) {
-		fprintf(stderr, "FS_IOC_ENABLE_VERITY: %m\n");
-		return 1;
-	}
-	close(fd);
-	return 0;
-}
-
-static int fsverity_set_measurement(int argc, char *argv[])
-{
-	static const struct option longopts[] = {
-		{"hash", required_argument, NULL, OPT_HASH},
-		{NULL, 0, NULL, 0},
-	};
-	const struct fsverity_hash_alg *alg =
-		&fsverity_hash_algs[FS_VERITY_ALG_SHA256];
-	int c;
-	int fd;
-	struct fsverity_measurement *measurement;
-
-	while ((c = getopt_long(argc, argv, "", longopts, NULL)) != -1) {
-		switch (c) {
-		case OPT_HASH:
-			alg = find_hash_alg(optarg);
-			if (!alg) {
-				fprintf(stderr,
-					"Unknown hash algorithm: '%s'\n",
-					optarg);
-				show_hash_algs();
-				return 2;
-			}
-			break;
-		default:
-			usage();
-		}
-	}
-	argv += optind;
-	argc -= optind;
-
-	if (argc != 2)
-		usage();
-
-	fd = open(argv[0], O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Can't open %s: %m\n", argv[0]);
-		return 1;
-	}
-
-	measurement = calloc(1, sizeof(*measurement) + alg->digest_size);
-	measurement->digest_algorithm = alg - &fsverity_hash_algs[0];
-	measurement->digest_size = alg->digest_size;
-	if (!parse_hex_digest(argv[1], measurement->digest, alg->digest_size)) {
-		fprintf(stderr,
-			"Invalid EXPECTED_MEASUREMENT hex string.  Expected %u-character hex string for hash algorithm '%s'\n",
-			alg->digest_size * 2, alg->name);
+	if (argc < 2) {
+		error_msg("no command specified");
+		usage_all(stderr);
 		return 2;
 	}
 
-	if (ioctl(fd, FS_IOC_SET_VERITY_MEASUREMENT, measurement)) {
-		fprintf(stderr, "FS_IOC_SET_VERITY_MEASUREMENT: %m\n");
-		return 1;
+	cmd = find_command(argv[1]);
+
+	handle_common_options(argc, argv, cmd);
+
+	if (!cmd) {
+		error_msg("unrecognized command: '%s'", argv[1]);
+		usage_all(stderr);
+		return 2;
 	}
-	close(fd);
-	return 0;
-}
-
-static const struct {
-	const char *name;
-	int (*func)(int argc, char *argv[]);
-} commands[] = {
-	{ "enable", fsverity_enable },
-	{ "set_measurement", fsverity_set_measurement },
-};
-
-int main(int argc, char *argv[])
-{
-	size_t i;
-
-	if (argc < 2)
-		usage();
-
-	for (i = 0; i < ARRAY_SIZE(commands); i++) {
-		if (!strcmp(argv[1], commands[i].name))
-			return commands[i].func(argc - 1, argv + 1);
-	}
-	usage();
+	return cmd->func(cmd, argc - 1, argv + 1);
 }
