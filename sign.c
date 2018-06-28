@@ -8,10 +8,12 @@
  */
 
 #include <fcntl.h>
+#include <limits.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/pkcs7.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "fsverity_sys_decls.h"
@@ -33,6 +35,22 @@ static void display_openssl_errors(void)
 		ERR_error_string_n(e, errmsg, sizeof(errmsg));
 		fprintf(stderr, "\t%s: %s:%d\n", errmsg, file, line);
 	}
+}
+
+static BIO *new_mem_buf(const void *buf, size_t size)
+{
+	BIO *bio;
+
+	ASSERT(size <= INT_MAX);
+	/*
+	 * Prior to OpenSSL 1.1.0, BIO_new_mem_buf() took a non-const pointer,
+	 * despite still marking the resulting bio as read-only.  So cast away
+	 * the const to avoid a compiler warning with older OpenSSL versions.
+	 */
+	bio = BIO_new_mem_buf((void *)buf, size);
+	if (!bio)
+		error_msg("out of memory");
+	return bio;
 }
 
 /* Read a PEM PKCS#8 formatted private key */
@@ -169,11 +187,9 @@ static bool sign_data(const void *data_to_sign, size_t data_size,
 		md = EVP_sha256();
 	}
 
-	bio = BIO_new_mem_buf(data_to_sign, data_size);
-	if (!bio) {
-		error_msg("out of memory");
+	bio = new_mem_buf(data_to_sign, data_size);
+	if (!bio)
 		goto out;
-	}
 
 	p7 = PKCS7_sign(NULL, NULL, NULL, bio, pkcs7_flags);
 	if (!p7) {
@@ -253,11 +269,9 @@ static bool read_signature(const char *signature_file,
 	if (!full_read(&file, sig, filesize))
 		goto out;
 
-	bio = BIO_new_mem_buf(sig, filesize);
-	if (!bio) {
-		error_msg("out of memory");
+	bio = new_mem_buf(sig, filesize);
+	if (!bio)
 		goto out;
-	}
 
 	p7 = d2i_PKCS7_bio(bio, NULL);
 	if (!p7) {

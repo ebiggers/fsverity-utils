@@ -7,8 +7,9 @@
  * Written by Eric Biggers, 2018.
  */
 
-#include <string.h>
 #include <openssl/evp.h>
+#include <stdlib.h>
+#include <string.h>
 #include <zlib.h>	/* for crc32() */
 
 #include "fsverity_sys_decls.h"
@@ -59,7 +60,12 @@ static void openssl_digest_ctx_free(struct hash_ctx *_ctx)
 {
 	struct openssl_hash_ctx *ctx = (void *)_ctx;
 
-	EVP_MD_CTX_free(ctx->md_ctx);
+	/*
+	 * OpenSSL 1.1.0 renamed EVP_MD_CTX_destroy() to EVP_MD_CTX_free() but
+	 * kept the old name as a macro.  Use the old name for compatibility
+	 * with older OpenSSL versions.
+	 */
+	EVP_MD_CTX_destroy(ctx->md_ctx);
 	free(ctx);
 }
 
@@ -74,8 +80,12 @@ openssl_digest_ctx_create(const struct fsverity_hash_alg *alg, const EVP_MD *md)
 	ctx->base.update = openssl_digest_update;
 	ctx->base.final = openssl_digest_final;
 	ctx->base.free = openssl_digest_ctx_free;
-
-	ctx->md_ctx = EVP_MD_CTX_new();
+	/*
+	 * OpenSSL 1.1.0 renamed EVP_MD_CTX_create() to EVP_MD_CTX_new() but
+	 * kept the old name as a macro.  Use the old name for compatibility
+	 * with older OpenSSL versions.
+	 */
+	ctx->md_ctx = EVP_MD_CTX_create();
 	if (!ctx->md_ctx)
 		fatal_error("out of memory");
 
