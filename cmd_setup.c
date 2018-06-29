@@ -308,7 +308,7 @@ static int fsveritysetup(const char *infile, const char *outfile,
 	struct filedes _out = { .fd = -1 };
 	struct filedes _tmp = { .fd = -1 };
 	struct hash_ctx *hash = NULL;
-	struct filedes *in = &_in, *out, *src;
+	struct filedes *in = &_in, *out = &_out, *src;
 	u64 filesize;
 	u64 aligned_filesize;
 	u64 src_filesize;
@@ -342,7 +342,6 @@ static int fsveritysetup(const char *infile, const char *outfile,
 		 * Invoked with two file arguments: we're copying the first file
 		 * to the second file, then appending verity metadata to it.
 		 */
-		out = &_out;
 		if (!open_file(out, outfile, O_RDWR|O_CREAT|O_TRUNC, 0644))
 			goto out_err;
 		if (!copy_file_data(in, out, filesize))
@@ -406,6 +405,13 @@ static int fsveritysetup(const char *infile, const char *outfile,
 	status = 0;
 out:
 	hash_free(hash);
+	if (status != 0 && out->fd >= 0) {
+		/* Error occurred; undo what we wrote */
+		if (in == out)
+			(void)ftruncate(out->fd, filesize);
+		else
+			out->autodelete = true;
+	}
 	filedes_close(&_in);
 	filedes_close(&_tmp);
 	if (!filedes_close(&_out) && status == 0)
