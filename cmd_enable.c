@@ -11,7 +11,7 @@
 #include <sys/ioctl.h>
 
 #include "commands.h"
-#include "fsverity_sys_decls.h"
+#include "fsverity_uapi.h"
 
 int fsverity_cmd_enable(const struct fsverity_command *cmd,
 			int argc, char *argv[])

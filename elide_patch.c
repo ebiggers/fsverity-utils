@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fsverity_sys_decls.h"
+#include "fsverity_uapi.h"
 #include "fsveritysetup.h"
 
 /* An elision or a patch */

@@ -10,9 +10,8 @@
 #include <openssl/evp.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>	/* for crc32() */
 
-#include "fsverity_sys_decls.h"
+#include "fsverity_uapi.h"
 #include "hash_algs.h"
 
 static void free_hash_ctx(struct hash_ctx *ctx)
@@ -100,47 +99,60 @@ static struct hash_ctx *create_sha256_ctx(const struct fsverity_hash_alg *alg)
 	return openssl_digest_ctx_create(alg, EVP_sha256());
 }
 
-/* ========== zlib wrapper for CRC-32 ========== */
+static struct hash_ctx *create_sha512_ctx(const struct fsverity_hash_alg *alg)
+{
+	return openssl_digest_ctx_create(alg, EVP_sha512());
+}
 
-struct crc32_hash_ctx {
+/* ========== CRC-32C ========== */
+
+/*
+ * There are faster ways to calculate CRC's, but for now we just use the
+ * 256-entry table method as it's portable and not too complex.
+ */
+
+#include "crc32c_table.h"
+
+struct crc32c_hash_ctx {
 	struct hash_ctx base;	/* must be first */
 	u32 remainder;
 };
 
-static void crc32_init(struct hash_ctx *_ctx)
+static void crc32c_init(struct hash_ctx *_ctx)
 {
-	struct crc32_hash_ctx *ctx = (void *)_ctx;
+	struct crc32c_hash_ctx *ctx = (void *)_ctx;
 
-	ctx->remainder = 0;
+	ctx->remainder = ~0;
 }
 
-static void crc32_update(struct hash_ctx *_ctx, const void *data, size_t size)
+static void crc32c_update(struct hash_ctx *_ctx, const void *data, size_t size)
 {
-	struct crc32_hash_ctx *ctx = (void *)_ctx;
+	struct crc32c_hash_ctx *ctx = (void *)_ctx;
+	const u8 *p = data;
+	u32 r = ctx->remainder;
 
-	ctx->remainder = crc32(ctx->remainder, data, size);
+	while (size--)
+		r = (r >> 8) ^ crc32c_table[(u8)r ^ *p++];
+
+	ctx->remainder = r;
 }
 
-/*
- * Big endian, to be compatible with `veritysetup --hash=crc32`, which uses
- * libgcrypt, which uses big endian CRC-32.
- */
-static void crc32_final(struct hash_ctx *_ctx, u8 *digest)
+static void crc32c_final(struct hash_ctx *_ctx, u8 *digest)
 {
-	struct crc32_hash_ctx *ctx = (void *)_ctx;
-	__be32 remainder = cpu_to_be32(ctx->remainder);
+	struct crc32c_hash_ctx *ctx = (void *)_ctx;
+	__le32 remainder = cpu_to_le32(~ctx->remainder);
 
 	memcpy(digest, &remainder, sizeof(remainder));
 }
 
-static struct hash_ctx *create_crc32_ctx(const struct fsverity_hash_alg *alg)
+static struct hash_ctx *create_crc32c_ctx(const struct fsverity_hash_alg *alg)
 {
-	struct crc32_hash_ctx *ctx = xzalloc(sizeof(*ctx));
+	struct crc32c_hash_ctx *ctx = xzalloc(sizeof(*ctx));
 
 	ctx->base.alg = alg;
-	ctx->base.init = crc32_init;
-	ctx->base.update = crc32_update;
-	ctx->base.final = crc32_final;
+	ctx->base.init = crc32c_init;
+	ctx->base.update = crc32c_update;
+	ctx->base.final = crc32c_final;
 	ctx->base.free = free_hash_ctx;
 	return &ctx->base;
 }
@@ -154,14 +166,20 @@ const struct fsverity_hash_alg fsverity_hash_algs[] = {
 		.cryptographic = true,
 		.create_ctx = create_sha256_ctx,
 	},
-	[FS_VERITY_ALG_CRC32] = {
-		.name = "crc32",
+	[FS_VERITY_ALG_SHA512] = {
+		.name = "sha512",
+		.digest_size = 64,
+		.cryptographic = true,
+		.create_ctx = create_sha512_ctx,
+	},
+	[FS_VERITY_ALG_CRC32C] = {
+		.name = "crc32c",
 		.digest_size = 4,
-		.create_ctx = create_crc32_ctx,
+		.create_ctx = create_crc32c_ctx,
 	},
 };
 
-const struct fsverity_hash_alg *find_hash_alg(const char *name)
+const struct fsverity_hash_alg *find_hash_alg_by_name(const char *name)
 {
 	int i;
 
@@ -174,6 +192,15 @@ const struct fsverity_hash_alg *find_hash_alg(const char *name)
 	fputs("Available hash algorithms: ", stderr);
 	show_all_hash_algs(stderr);
 	putc('\n', stderr);
+	return NULL;
+}
+
+const struct fsverity_hash_alg *find_hash_alg_by_num(unsigned int num)
+{
+	if (num < ARRAY_SIZE(fsverity_hash_algs) &&
+	    fsverity_hash_algs[num].name)
+		return &fsverity_hash_algs[num];
+
 	return NULL;
 }
 

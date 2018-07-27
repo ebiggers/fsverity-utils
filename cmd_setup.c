@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 #include "commands.h"
-#include "fsverity_sys_decls.h"
+#include "fsverity_uapi.h"
 #include "fsveritysetup.h"
 #include "hash_algs.h"
 
@@ -62,7 +62,7 @@ static bool parse_blocksize_option(const char *opt, int *blocksize_ret)
  * block offset at which that level's hash blocks start.  Level 'depth - 1' is
  * the root and is stored first in the file, in the first block following the
  * original data.  Level 0 is the "leaf" level: it's directly "above" the data
- * blocks and is stored last in the file, just before the fs-verity footer.
+ * blocks and is stored last in the file.
  */
 static void compute_tree_layout(u64 data_size, u64 tree_offset, int blockbits,
 				unsigned int hashes_per_block,
@@ -229,61 +229,58 @@ void fsverity_append_extension(void **buf_p, int type,
 }
 
 /*
- * Append the authenticated portion of the fs-verity footer to 'out', in the
+ * Append the authenticated portion of the fs-verity descriptor to 'out', in the
  * process updating 'hash' with the data written.
  */
-static int append_auth_footer(const struct fsveritysetup_params *params,
-			      u64 filesize, struct filedes *out,
-			      struct hash_ctx *hash)
+static int append_fsverity_descriptor(const struct fsveritysetup_params *params,
+				      u64 filesize, const u8 *root_hash,
+				      struct filedes *out,
+				      struct hash_ctx *hash)
 {
-	size_t ftr_auth_len;
+	size_t desc_auth_len;
 	void *buf;
-	struct fsverity_footer *ftr;
+	struct fsverity_descriptor *desc;
+	u16 auth_ext_count;
 	int status;
 
-	ftr_auth_len = sizeof(*ftr);
+	desc_auth_len = sizeof(*desc);
+	desc_auth_len += FSVERITY_EXTLEN(params->hash_alg->digest_size);
 	if (params->saltlen)
-		ftr_auth_len += FSVERITY_EXTLEN(params->saltlen);
-	ftr_auth_len += total_elide_patch_ext_length(params);
-	ftr = buf = xzalloc(ftr_auth_len);
+		desc_auth_len += FSVERITY_EXTLEN(params->saltlen);
+	desc_auth_len += total_elide_patch_ext_length(params);
+	desc = buf = xzalloc(desc_auth_len);
 
-	memcpy(ftr->magic, FS_VERITY_MAGIC, sizeof(ftr->magic));
-	ftr->major_version = FS_VERITY_MAJOR;
-	ftr->minor_version = FS_VERITY_MINOR;
-	ftr->log_blocksize = params->blockbits;
-	/* TODO: should we be storing 'log_hash_blocksize' instead? */
-	if (!is_power_of_2(params->hashes_per_block)) {
-		error_msg("Unsupported hashes_per_block (%u); must be a power of 2",
-			  params->hashes_per_block);
-		goto out_err;
-	}
-	ftr->log_arity = ilog2(params->hashes_per_block);
-	ftr->meta_algorithm = cpu_to_le16(params->hash_alg -
-					  fsverity_hash_algs);
-	ftr->data_algorithm = ftr->meta_algorithm;
-	ftr->size = cpu_to_le64(filesize);
+	memcpy(desc->magic, FS_VERITY_MAGIC, sizeof(desc->magic));
+	desc->major_version = 1;
+	desc->minor_version = 0;
+	desc->log_data_blocksize = params->blockbits;
+	desc->log_tree_blocksize = params->blockbits;
+	desc->data_algorithm = cpu_to_le16(params->hash_alg -
+					   fsverity_hash_algs);
+	desc->tree_algorithm = desc->data_algorithm;
+	desc->orig_file_size = cpu_to_le64(filesize);
 
-	ftr->authenticated_ext_count = params->num_elisions_and_patches;
+	auth_ext_count = 1; /* root hash */
 	if (params->saltlen)
-		ftr->authenticated_ext_count++;
+		auth_ext_count++;
+	auth_ext_count += params->num_elisions_and_patches;
+	desc->auth_ext_count = cpu_to_le16(auth_ext_count);
 
-	ftr->unauthenticated_ext_count = 0;
-	if (params->signing_key_file || params->signature_file)
-		ftr->unauthenticated_ext_count++;
-
-	buf += sizeof(*ftr);
+	buf += sizeof(*desc);
+	fsverity_append_extension(&buf, FS_VERITY_EXT_ROOT_HASH,
+				  root_hash, params->hash_alg->digest_size);
 	if (params->saltlen)
 		fsverity_append_extension(&buf, FS_VERITY_EXT_SALT,
 					  params->salt, params->saltlen);
 	append_elide_patch_exts(&buf, params);
-	ASSERT(buf - (void *)ftr == ftr_auth_len);
+	ASSERT(buf - (void *)desc == desc_auth_len);
 
-	hash_update(hash, ftr, ftr_auth_len);
-	if (!full_write(out, ftr, ftr_auth_len))
+	hash_update(hash, desc, desc_auth_len);
+	if (!full_write(out, desc, desc_auth_len))
 		goto out_err;
 	status = 0;
 out:
-	free(ftr);
+	free(desc);
 	return status;
 
 out_err:
@@ -291,12 +288,47 @@ out_err:
 	goto out;
 }
 
-static int append_ftr_reverse_offset(struct filedes *out, u64 ftr_offset)
+/*
+ * Append any needed unauthenticated extension items: currently, just possibly a
+ * PKCS7_SIGNATURE item containing the signed file measurement.
+ */
+static int
+append_unauthenticated_extensions(struct filedes *out,
+				  const struct fsveritysetup_params *params,
+				  const u8 *measurement)
 {
-	__le32 offs;
+	u16 unauth_ext_count = 0;
+	struct {
+		__le16 unauth_ext_count;
+		__le16 pad[3];
+	} hdr;
+	bool have_sig = params->signing_key_file || params->signature_file;
 
-	offs = cpu_to_le32(out->pos + sizeof(offs) - ftr_offset);
-	if (!full_write(out, &offs, sizeof(offs)))
+	if (have_sig)
+		unauth_ext_count++;
+
+	ASSERT(sizeof(hdr) % 8 == 0);
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.unauth_ext_count = cpu_to_le16(unauth_ext_count);
+
+	if (!full_write(out, &hdr, sizeof(hdr)))
+		return 1;
+
+	if (have_sig)
+		return append_signed_measurement(out, params, measurement);
+
+	return 0;
+}
+
+static int append_footer(struct filedes *out, u64 desc_offset)
+{
+	struct fsverity_footer ftr;
+	u32 offset = (out->pos + sizeof(ftr)) - desc_offset;
+
+	ftr.desc_reverse_offset = cpu_to_le32(offset);
+	memcpy(ftr.magic, FS_VERITY_MAGIC, sizeof(ftr.magic));
+
+	if (!full_write(out, &ftr, sizeof(ftr)))
 		return 1;
 	return 0;
 }
@@ -373,35 +405,28 @@ static int fsveritysetup(const char *infile, const char *outfile,
 				   &tree_end_offset, root_hash);
 	if (status)
 		goto out;
-
-	/*
-	 * Append the fixed-size portion of the footer and any authenticated
-	 * extensions, then calculate the file measurement: the hash of the
-	 * authenticated footer portion and the Merkle tree root hash.
-	 */
 	if (!filedes_seek(out, tree_end_offset, SEEK_SET))
 		goto out_err;
+
+	/* Append the additional needed metadata */
+
 	hash_init(hash);
-	status = append_auth_footer(params, filesize, out, hash);
+	status = append_fsverity_descriptor(params, filesize, root_hash,
+					    out, hash);
 	if (status)
 		goto out;
-	hash_update(hash, root_hash, params->hash_alg->digest_size);
 	hash_final(hash, measurement);
 
-	/* If requested, append the signed file measurement */
-	status = append_signed_measurement(out, params, measurement);
+	status = append_unauthenticated_extensions(out, params, measurement);
 	if (status)
 		goto out;
 
-	/* Finish by appending the 'ftr_reverse_offset' field */
-	status = append_ftr_reverse_offset(out, tree_end_offset);
+	status = append_footer(out, tree_end_offset);
 	if (status)
 		goto out;
 
-	bin2hex(root_hash, params->hash_alg->digest_size, hash_hex);
-	printf("Merkle root hash: %s\n", hash_hex);
 	bin2hex(measurement, params->hash_alg->digest_size, hash_hex);
-	printf("fs-verity measurement: %s\n", hash_hex);
+	printf("File measurement: %s:%s\n", params->hash_alg->name, hash_hex);
 	status = 0;
 out:
 	hash_free(hash);
@@ -437,7 +462,7 @@ int fsverity_cmd_setup(const struct fsverity_command *cmd,
 	while ((c = getopt_long(argc, argv, "", longopts, NULL)) != -1) {
 		switch (c) {
 		case OPT_HASH:
-			params.hash_alg = find_hash_alg(optarg);
+			params.hash_alg = find_hash_alg_by_name(optarg);
 			if (!params.hash_alg)
 				goto out_usage;
 			break;

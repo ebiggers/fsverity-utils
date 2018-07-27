@@ -14,7 +14,7 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 			int argc, char *argv[]);
 int fsverity_cmd_setup(const struct fsverity_command *cmd,
 		       int argc, char *argv[]);
-int fsverity_cmd_set_measurement(const struct fsverity_command *cmd,
-				 int argc, char *argv[]);
+int fsverity_cmd_measure(const struct fsverity_command *cmd,
+			 int argc, char *argv[]);
 
 #endif /* COMMANDS_H */

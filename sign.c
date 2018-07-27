@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fsverity_sys_decls.h"
+#include "fsverity_uapi.h"
 #include "fsveritysetup.h"
 #include "hash_algs.h"
 
@@ -99,33 +99,29 @@ static X509 *read_certificate(const char *certfile)
 }
 
 /*
- * Check that the given data is a valid 'struct fsverity_signed_measurement'
- * that matches the given @expected_measurement and @hash_alg.
+ * Check that the given data is a valid 'struct fsverity_digest_disk' that
+ * matches the given @expected_digest and @hash_alg.
  *
- * Return: NULL if valid, else a string describing why the data is invalid.
+ * Return: NULL if the digests match, else a string describing the difference.
  */
 static const char *
-sanity_check_fsverity_measurement(const void *signed_data, size_t size,
-				  const u8 *expected_measurement,
-				  const struct fsverity_hash_alg *hash_alg)
+compare_fsverity_digest(const void *data, size_t size,
+			const u8 *expected_digest,
+			const struct fsverity_hash_alg *hash_alg)
 {
-	const struct fsverity_signed_measurement *m = signed_data;
+	const struct fsverity_digest_disk *d = data;
 
-	if (size != sizeof(*m) + hash_alg->digest_size)
+	if (size != sizeof(*d) + hash_alg->digest_size)
 		return "unexpected length";
 
-	if (le16_to_cpu(m->digest_algorithm) != hash_alg - fsverity_hash_algs)
+	if (le16_to_cpu(d->digest_algorithm) != hash_alg - fsverity_hash_algs)
 		return "unexpected hash algorithm";
 
-	if (le16_to_cpu(m->digest_size) != hash_alg->digest_size)
+	if (le16_to_cpu(d->digest_size) != hash_alg->digest_size)
 		return "wrong digest size for hash algorithm";
 
-	if (m->reserved1 ||
-	    m->reserved2[0] || m->reserved2[1] || m->reserved2[2])
-		return "reserved bits set";
-
-	if (memcmp(expected_measurement, m->digest, hash_alg->digest_size))
-		return "wrong hash";
+	if (memcmp(expected_digest, d->digest, hash_alg->digest_size))
+		return "wrong digest";
 
 	return NULL;
 }
@@ -287,9 +283,9 @@ static bool read_signature(const char *signature_file,
 	} else {
 		const ASN1_OCTET_STRING *o = p7->d.sign->contents->d.data;
 
-		reason = sanity_check_fsverity_measurement(o->data, o->length,
-							   expected_measurement,
-							   hash_alg);
+		reason = compare_fsverity_digest(o->data, o->length,
+						 expected_measurement,
+						 hash_alg);
 	}
 	if (reason) {
 		error_msg("signed file measurement from '%s' is invalid (%s)",
@@ -328,8 +324,8 @@ static bool write_signature(const char *signature_file,
 }
 
 /*
- * If requested, append the signed file measurement to the fs-verity footer as a
- * PKCS7_SIGNATURE extension item.
+ * Append the signed file measurement to the output file as a PKCS7_SIGNATURE
+ * extension item.
  *
  * Return: exit status code (0 on success, nonzero on failure)
  */
@@ -337,7 +333,7 @@ int append_signed_measurement(struct filedes *out,
 			      const struct fsveritysetup_params *params,
 			      const u8 *measurement)
 {
-	struct fsverity_signed_measurement *data_to_sign = NULL;
+	struct fsverity_digest_disk *data_to_sign = NULL;
 	void *sig = NULL;
 	void *extbuf = NULL;
 	void *tmp;
@@ -358,8 +354,8 @@ int append_signed_measurement(struct filedes *out,
 		memcpy(data_to_sign->digest, measurement,
 		       params->hash_alg->digest_size);
 
-		ASSERT(sanity_check_fsverity_measurement(data_to_sign,
-			data_size, measurement, params->hash_alg) == NULL);
+		ASSERT(compare_fsverity_digest(data_to_sign, data_size,
+					measurement, params->hash_alg) == NULL);
 
 		if (!sign_data(data_to_sign, data_size,
 			       params->signing_key_file,
@@ -373,16 +369,12 @@ int append_signed_measurement(struct filedes *out,
 		    !write_signature(params->signature_file, sig, sig_size))
 			goto out_err;
 	} else {
-		if (!params->signature_file)
-			return 0;
-
 		/* Using a signature that was already created */
 		if (!read_signature(params->signature_file, measurement,
 				    params->hash_alg, &sig, &sig_size))
 			goto out_err;
 	}
 
-	/* Append the signature to the fs-verity footer as an extension item */
 	tmp = extbuf = xzalloc(FSVERITY_EXTLEN(sig_size));
 	fsverity_append_extension(&tmp, FS_VERITY_EXT_PKCS7_SIGNATURE,
 				  sig, sig_size);

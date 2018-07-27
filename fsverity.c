@@ -27,6 +27,13 @@ static const struct fsverity_command {
 		.usage_str =
 "    fsverity enable FILE\n"
 	}, {
+		.name = "measure",
+		.func = fsverity_cmd_measure,
+		.short_desc =
+"Display the measurement of the given fs-verity file(s)",
+		.usage_str =
+"    fsverity measure FILE...\n"
+	}, {
 		.name = "setup",
 		.func = fsverity_cmd_setup,
 		.short_desc = "Create the verity metadata for a file",
@@ -35,14 +42,7 @@ static const struct fsverity_command {
 "                   [--hash=HASH_ALG] [--salt=SALT] [--signing-key=KEYFILE]\n"
 "                   [--signing-cert=CERTFILE] [--signature=SIGFILE]\n"
 "                   [--patch=OFFSET,PATCHFILE] [--elide=OFFSET,LENGTH]\n"
-	}, {
-		.name = "set_measurement",
-		.func = fsverity_cmd_set_measurement,
-		.short_desc =
-"Set the trusted file measurement for the given fs-verity file",
-		.usage_str =
-"    fsverity set_measurement FILE EXPECTED_MEASUREMENT [--hash=HASH_ALG]\n"
-	},
+	}
 };
 
 static void usage_all(FILE *fp)

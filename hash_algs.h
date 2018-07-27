@@ -23,7 +23,8 @@ struct hash_ctx {
 	void (*free)(struct hash_ctx *ctx);
 };
 
-const struct fsverity_hash_alg *find_hash_alg(const char *name);
+const struct fsverity_hash_alg *find_hash_alg_by_name(const char *name);
+const struct fsverity_hash_alg *find_hash_alg_by_num(unsigned int num);
 void show_all_hash_algs(FILE *fp);
 #define DEFAULT_HASH_ALG (&fsverity_hash_algs[FS_VERITY_ALG_SHA256])
 
@@ -31,7 +32,7 @@ void show_all_hash_algs(FILE *fp);
  * Largest digest size among all hash algorithms supported by fs-verity.
  * This can be increased if needed.
  */
-#define FS_VERITY_MAX_DIGEST_SIZE	32
+#define FS_VERITY_MAX_DIGEST_SIZE	64
 
 static inline struct hash_ctx *hash_create(const struct fsverity_hash_alg *alg)
 {
