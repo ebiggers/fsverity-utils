@@ -17,7 +17,6 @@ clean:
 	rm -f $(EXE) $(OBJ)
 
 install:all
-	install -Dm755 -t $(DESTDIR)/bin $(EXE) \
-		mkfsverity.sh full-run-fsverity.sh
+	install -Dm755 -t $(DESTDIR)/bin $(EXE)
 
 .PHONY: all clean install
