@@ -22,19 +22,11 @@
 
 static void display_openssl_errors(void)
 {
-	unsigned long e;
-	const char *file;
-	int line;
-	char errmsg[128];
-
 	if (ERR_peek_error() == 0)
 		return;
 
 	fprintf(stderr, "OpenSSL library errors:\n");
-	while ((e = ERR_get_error_line(&file, &line)) != 0) {
-		ERR_error_string_n(e, errmsg, sizeof(errmsg));
-		fprintf(stderr, "\t%s: %s:%d\n", errmsg, file, line);
-	}
+	ERR_print_errors_fp(stderr);
 }
 
 static BIO *new_mem_buf(const void *buf, size_t size)
