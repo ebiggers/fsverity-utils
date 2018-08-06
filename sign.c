@@ -20,8 +20,15 @@
 #include "fsveritysetup.h"
 #include "hash_algs.h"
 
-static void display_openssl_errors(void)
+static void __printf(1, 2) __cold
+error_msg_openssl(const char *format, ...)
 {
+	va_list va;
+
+	va_start(va, format);
+	do_error_msg(format, va, 0);
+	va_end(va);
+
 	if (ERR_peek_error() == 0)
 		return;
 
@@ -41,7 +48,7 @@ static BIO *new_mem_buf(const void *buf, size_t size)
 	 */
 	bio = BIO_new_mem_buf((void *)buf, size);
 	if (!bio)
-		error_msg("out of memory");
+		error_msg_openssl("out of memory");
 	return bio;
 }
 
@@ -53,16 +60,15 @@ static EVP_PKEY *read_private_key(const char *keyfile)
 
 	bio = BIO_new_file(keyfile, "r");
 	if (!bio) {
-		error_msg_errno("can't open '%s' for reading", keyfile);
+		error_msg_openssl("can't open '%s' for reading", keyfile);
 		return NULL;
 	}
 
 	pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
 	if (!pkey) {
-		error_msg("Failed to parse private key file '%s'.\n"
-			  "       Note: it must be in PEM PKCS#8 format.",
-			  keyfile);
-		display_openssl_errors();
+		error_msg_openssl("Failed to parse private key file '%s'.\n"
+				  "       Note: it must be in PEM PKCS#8 format.",
+				  keyfile);
 	}
 	BIO_free(bio);
 	return pkey;
@@ -76,15 +82,14 @@ static X509 *read_certificate(const char *certfile)
 
 	bio = BIO_new_file(certfile, "r");
 	if (!bio) {
-		error_msg_errno("can't open '%s' for reading", certfile);
+		error_msg_openssl("can't open '%s' for reading", certfile);
 		return NULL;
 	}
 	cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
 	if (!cert) {
-		error_msg("Failed to parse X.509 certificate file '%s'.\n"
-			  "       Note: it must be in PEM format.",
-			  certfile);
-		display_openssl_errors();
+		error_msg_openssl("Failed to parse X.509 certificate file '%s'.\n"
+				  "       Note: it must be in PEM format.",
+				  certfile);
 	}
 	BIO_free(bio);
 	return cert;
@@ -181,33 +186,29 @@ static bool sign_data(const void *data_to_sign, size_t data_size,
 
 	p7 = PKCS7_sign(NULL, NULL, NULL, bio, pkcs7_flags);
 	if (!p7) {
-		error_msg("failed to initialize PKCS#7 signature object");
-		display_openssl_errors();
+		error_msg_openssl("failed to initialize PKCS#7 signature object");
 		goto out;
 	}
 
 	if (!PKCS7_sign_add_signer(p7, cert, pkey, md, pkcs7_flags)) {
-		error_msg("failed to add signer to PKCS#7 signature object");
-		display_openssl_errors();
+		error_msg_openssl("failed to add signer to PKCS#7 signature object");
 		goto out;
 	}
 
 	if (PKCS7_final(p7, bio, pkcs7_flags) != 1) {
-		error_msg("failed to finalize PKCS#7 signature");
-		display_openssl_errors();
+		error_msg_openssl("failed to finalize PKCS#7 signature");
 		goto out;
 	}
 
 	BIO_free(bio);
 	bio = BIO_new(BIO_s_mem());
 	if (!bio) {
-		error_msg("out of memory");
+		error_msg_openssl("out of memory");
 		goto out;
 	}
 
 	if (i2d_PKCS7_bio(bio, p7) != 1) {
-		error_msg("failed to DER-encode PKCS#7 signature object");
-		display_openssl_errors();
+		error_msg_openssl("failed to DER-encode PKCS#7 signature object");
 		goto out;
 	}
 
@@ -263,9 +264,8 @@ static bool read_signature(const char *signature_file,
 
 	p7 = d2i_PKCS7_bio(bio, NULL);
 	if (!p7) {
-		error_msg("failed to decode PKCS#7 signature from '%s'",
-			  signature_file);
-		display_openssl_errors();
+		error_msg_openssl("failed to decode PKCS#7 signature from '%s'",
+				  signature_file);
 		goto out;
 	}
 

@@ -67,7 +67,7 @@ char *xasprintf(const char *format, ...)
 
 /* ========== Error messages and assertions ========== */
 
-static void do_error_msg(const char *format, va_list va, int err)
+void do_error_msg(const char *format, va_list va, int err)
 {
 	fputs("ERROR: ", stderr);
 	vfprintf(stderr, format, va);

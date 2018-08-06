@@ -8,6 +8,7 @@
 #define UTIL_H
 
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -99,6 +100,7 @@ __printf(1, 2) char *xasprintf(const char *format, ...);
 
 /* ========== Error messages and assertions ========== */
 
+__cold void do_error_msg(const char *format, va_list va, int err);
 __printf(1, 2) __cold void error_msg(const char *format, ...);
 __printf(1, 2) __cold void error_msg_errno(const char *format, ...);
 __printf(1, 2) __cold __noreturn void fatal_error(const char *format, ...);
