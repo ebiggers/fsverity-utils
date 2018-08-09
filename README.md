@@ -8,8 +8,8 @@ file.  The mechanism is similar to dm-verity, but implemented at the
 file level rather than at the block device level.  The `fsverity`
 utility allows you to set up fs-verity protected files.
 
-So far, fs-verity is planned to be supported by the ext4 and f2fs
-filesystems.
+fs-verity will initially be supported by the ext4 and f2fs
+filesystems, but it may later be supported by other filesystems too.
 
 # Building and installing
 
@@ -32,6 +32,8 @@ Then, to build and install:
 
 # Examples
 
+## Basic use
+
 ```bash
     mkfs.f2fs -O verity /dev/vdc
     mount /dev/vdc /vdc
@@ -41,20 +43,70 @@ Then, to build and install:
     head -c 1000000 /dev/urandom > file
     md5sum file
 
-    # Append the Merkle tree and other metadata to the file, and
-    # (optional) sign the file with the kernel build-time generated key:
-    fsverity setup file --signing-key ~/linux/certs/signing_key.pem
+    # Append the Merkle tree and other metadata to the file:
+    fsverity setup file
 
     # Enable fs-verity on the file
     fsverity enable file
 
-    # Should show the same hash that 'fsverity setup' printed
+    # Should show the same hash that 'fsverity setup' printed.
+    # This hash can be logged, or compared to a trusted value.
     fsverity measure file
 
     # Contents are now transparently verified and should match the
     # original file contents, i.e. the metadata is hidden.
     md5sum file
 ```
+
+Note that in the above example, the file isn't signed.  Therefore, to
+get any authenticity protection (as opposed to just integrity
+protection), the output of `fsverity measure` needs to be compared
+against a trusted value.
+
+## Using builtin signatures
+
+With `CONFIG_FS_VERITY_BUILTIN_SIGNATURES=y`, the filesystem supports
+automatically verifying a signed file measurement that has been
+included in the fs-verity metadata.  The signature is verified against
+the set of X.509 certificates that have been loaded into the
+".fs-verity" kernel keyring.  Here's an example:
+
+```bash
+    # Generate a new certificate and private key:
+    openssl req -newkey rsa:4096 -nodes -keyout key.pem -x509 -out cert.pem
+
+    # Convert the certificate from PEM to DER format:
+    openssl x509 -in cert.pem -out cert.der -outform der
+
+    # Load the certificate into the fs-verity keyring:
+    keyctl padd asymmetric '' %keyring:.fs-verity < cert.der
+
+    # Optionally, lock the keyring so that no more keys can be added
+    # (requires keyctl v1.5.11 or later):
+    keyctl restrict_keyring %keyring:.fs-verity
+
+    # Optionally, require that all fs-verity files be signed:
+    sysctl fs.verity.require_signatures=1
+
+    # Now set up fs-verity on a test file:
+    md5sum file
+    fsverity setup file --signing-key=key.pem --signing-cert=cert.pem
+    fsverity enable file
+    md5sum file
+```
+
+By default, it's not required that fs-verity files have a signature.
+This can be changed with `sysctl fs.verity.require_signatures=1`.
+When set, it's guaranteed that the contents of every fs-verity file
+has been signed by one of the certificates in the keyring.
+
+Note: applications generally still need to check whether the file
+they're accessing really is a fs-verity file, since an attacker could
+replace a fs-verity file with a regular one.
+
+## With IMA
+
+IMA support for fs-verity is planned.
 
 # Notices
 
