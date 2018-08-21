@@ -2,9 +2,9 @@
 /*
  * fs-verity userspace tool
  *
- * Copyright (C) 2018 Google, Inc.
+ * Copyright (C) 2018 Google LLC
  *
- * Written by Eric Biggers, 2018.
+ * Written by Eric Biggers.
  */
 
 #include <stdlib.h>
@@ -83,7 +83,7 @@ static void show_version(void)
 {
 	static const char * const str =
 "fsverity " PACKAGE_VERSION "\n"
-"Copyright (C) 2018 Google, Inc.\n"
+"Copyright (C) 2018 Google LLC\n"
 "License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl.html>.\n"
 "This is free software: you are free to change and redistribute it.\n"
 "There is NO WARRANTY, to the extent permitted by law.\n"

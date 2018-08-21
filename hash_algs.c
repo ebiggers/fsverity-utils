@@ -2,9 +2,9 @@
 /*
  * fs-verity hash algorithms
  *
- * Copyright (C) 2018 Google, Inc.
+ * Copyright (C) 2018 Google LLC
  *
- * Written by Eric Biggers, 2018.
+ * Written by Eric Biggers.
  */
 
 #include <openssl/evp.h>

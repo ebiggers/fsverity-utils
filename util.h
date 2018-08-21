@@ -2,7 +2,7 @@
 /*
  * Utility functions and macros for the 'fsverity' program
  *
- * Copyright (C) 2018 Google, Inc.
+ * Copyright (C) 2018 Google LLC
  */
 #ifndef UTIL_H
 #define UTIL_H

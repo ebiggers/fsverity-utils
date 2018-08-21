@@ -2,7 +2,7 @@
 /*
  * fs-verity (file-based verity) support
  *
- * Copyright (C) 2018 Google, Inc.
+ * Copyright (C) 2018 Google LLC
  */
 #ifndef _UAPI_LINUX_FSVERITY_H
 #define _UAPI_LINUX_FSVERITY_H

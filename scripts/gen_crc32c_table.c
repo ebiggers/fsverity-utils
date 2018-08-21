@@ -2,9 +2,9 @@
 /*
  * Generate a table for CRC-32C calculation.
  *
- * Copyright (C) 2018 Google, Inc.
+ * Copyright (C) 2018 Google LLC
  *
- * Written by Eric Biggers, 2018.
+ * Written by Eric Biggers.
  */
 
 #include <stdint.h>
