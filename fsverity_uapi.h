@@ -107,6 +107,6 @@ struct fsverity_extension_patch {
 struct fsverity_footer {
 	__le32 desc_reverse_offset;	/* distance to fsverity_descriptor */
 	__u8 magic[8];			/* FS_VERITY_MAGIC */
-} __packed;
+} __attribute__((packed));
 
 #endif /* _UAPI_LINUX_FSVERITY_H */
