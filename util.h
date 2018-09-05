@@ -17,17 +17,26 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-#ifdef __CHECKER__
-#  define __force	__attribute__((force))
-#else
-#  define __force
+#ifndef __force
+#  ifdef __CHECKER__
+#    define __force	__attribute__((force))
+#  else
+#    define __force
+#  endif
 #endif
 
-#define __printf(fmt_idx, vargs_idx) \
+#ifndef __printf
+#  define __printf(fmt_idx, vargs_idx) \
 	__attribute__((format(printf, fmt_idx, vargs_idx)))
+#endif
 
-#define __noreturn	__attribute__((noreturn))
-#define __cold		__attribute__((cold))
+#ifndef __noreturn
+#  define __noreturn	__attribute__((noreturn))
+#endif
+
+#ifndef __cold
+#  define __cold	__attribute__((cold))
+#endif
 
 #define min(a, b) ({			\
 	__typeof__(a) _a = (a);		\
