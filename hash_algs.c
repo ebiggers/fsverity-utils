@@ -102,14 +102,16 @@ static struct hash_ctx *create_sha512_ctx(const struct fsverity_hash_alg *alg)
 /* ========== Hash algorithm definitions ========== */
 
 const struct fsverity_hash_alg fsverity_hash_algs[] = {
-	[FS_VERITY_ALG_SHA256] = {
+	[FS_VERITY_HASH_ALG_SHA256] = {
 		.name = "sha256",
 		.digest_size = 32,
+		.block_size = 64,
 		.create_ctx = create_sha256_ctx,
 	},
-	[FS_VERITY_ALG_SHA512] = {
+	[FS_VERITY_HASH_ALG_SHA512] = {
 		.name = "sha512",
 		.digest_size = 64,
+		.block_size = 128,
 		.create_ctx = create_sha512_ctx,
 	},
 };
@@ -150,4 +152,12 @@ void show_all_hash_algs(FILE *fp)
 			sep = ", ";
 		}
 	}
+}
+
+/* ->init(), ->update(), and ->final() all in one step */
+void hash_full(struct hash_ctx *ctx, const void *data, size_t size, u8 *digest)
+{
+	hash_init(ctx);
+	hash_update(ctx, data, size);
+	hash_final(ctx, digest);
 }

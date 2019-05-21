@@ -49,6 +49,11 @@ typedef uint64_t u64;
 	_a > _b ? _a : _b;		\
 })
 
+#define roundup(x, y) ({		\
+	__typeof__(y) _y = (y);		\
+	(((x) + _y - 1) / _y) * _y;	\
+})
+
 #define ARRAY_SIZE(A)		(sizeof(A) / sizeof((A)[0]))
 
 #define DIV_ROUND_UP(n, d)	(((n) + (d) - 1) / (d))

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Signature support for 'fsverity setup'
+ * The 'fsverity sign' command
  *
  * Copyright (C) 2018 Google LLC
  *
@@ -8,6 +8,7 @@
  */
 
 #include <fcntl.h>
+#include <getopt.h>
 #include <limits.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -16,9 +17,39 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "commands.h"
 #include "fsverity_uapi.h"
-#include "fsveritysetup.h"
 #include "hash_algs.h"
+
+/*
+ * Merkle tree properties.  The file measurement is the hash of this structure
+ * excluding the signature and with the sig_size field set to 0.
+ */
+struct fsverity_descriptor {
+	__u8 version;		/* must be 1 */
+	__u8 hash_algorithm;	/* Merkle tree hash algorithm */
+	__u8 log_blocksize;	/* log2 of size of data and tree blocks */
+	__u8 salt_size;		/* size of salt in bytes; 0 if none */
+	__le32 sig_size;	/* size of signature in bytes; 0 if none */
+	__le64 data_size;	/* size of file the Merkle tree is built over */
+	__u8 root_hash[64];	/* Merkle tree root hash */
+	__u8 salt[32];		/* salt prepended to each hashed block */
+	__u8 __reserved[144];	/* must be 0's */
+	__u8 signature[];	/* optional PKCS#7 signature */
+};
+
+/*
+ * Format in which verity file measurements are signed.  This is the same as
+ * 'struct fsverity_digest', except here some magic bytes are prepended to
+ * provide some context about what is being signed in case the same key is used
+ * for non-fsverity purposes, and here the fields have fixed endianness.
+ */
+struct fsverity_signed_digest {
+	char magic[8];			/* must be "FSVerity" */
+	__le16 digest_algorithm;
+	__le16 digest_size;
+	__u8 digest[];
+};
 
 static void __printf(1, 2) __cold
 error_msg_openssl(const char *format, ...)
@@ -79,39 +110,11 @@ static X509 *read_certificate(const char *certfile)
 	return cert;
 }
 
-/*
- * Check that the given data is a valid 'struct fsverity_digest_disk' that
- * matches the given @expected_digest and @hash_alg.
- *
- * Return: NULL if the digests match, else a string describing the difference.
- */
-static const char *
-compare_fsverity_digest(const void *data, size_t size,
-			const u8 *expected_digest,
-			const struct fsverity_hash_alg *hash_alg)
-{
-	const struct fsverity_digest_disk *d = data;
-
-	if (size != sizeof(*d) + hash_alg->digest_size)
-		return "unexpected length";
-
-	if (le16_to_cpu(d->digest_algorithm) != hash_alg - fsverity_hash_algs)
-		return "unexpected hash algorithm";
-
-	if (le16_to_cpu(d->digest_size) != hash_alg->digest_size)
-		return "wrong digest size for hash algorithm";
-
-	if (memcmp(expected_digest, d->digest, hash_alg->digest_size))
-		return "wrong digest";
-
-	return NULL;
-}
-
 #ifdef OPENSSL_IS_BORINGSSL
 
 static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 		       EVP_PKEY *pkey, X509 *cert, const EVP_MD *md,
-		       void **sig_ret, int *sig_size_ret)
+		       u8 **sig_ret, u32 *sig_size_ret)
 {
 	CBB out, outer_seq, wrapped_seq, seq, digest_algos_set, digest_algo,
 		null, content_info, issuer_and_serial, signed_data,
@@ -211,40 +214,6 @@ out:
 	return ok;
 }
 
-static const char *
-compare_fsverity_digest_pkcs7(const void *sig, size_t sig_len,
-			      const u8 *expected_measurement,
-			      const struct fsverity_hash_alg *hash_alg)
-{
-	CBS in, content_info, content_type, wrapped_signed_data, signed_data,
-		content, wrapped_data, data;
-	u64 version;
-
-	CBS_init(&in, sig, sig_len);
-	if (!CBS_get_asn1(&in, &content_info, CBS_ASN1_SEQUENCE) ||
-	    !CBS_get_asn1(&content_info, &content_type, CBS_ASN1_OBJECT) ||
-	    (OBJ_cbs2nid(&content_type) != NID_pkcs7_signed) ||
-	    !CBS_get_asn1(
-		&content_info, &wrapped_signed_data,
-		CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0) ||
-	    !CBS_get_asn1(&wrapped_signed_data, &signed_data,
-			  CBS_ASN1_SEQUENCE) ||
-	    !CBS_get_asn1_uint64(&signed_data, &version) ||
-	    (version < 1) ||
-	    !CBS_get_asn1(&signed_data, NULL /* digests */, CBS_ASN1_SET) ||
-	    !CBS_get_asn1(&signed_data, &content, CBS_ASN1_SEQUENCE) ||
-	    !CBS_get_asn1(&content, &content_type, CBS_ASN1_OBJECT) ||
-	    (OBJ_cbs2nid(&content_type) != NID_pkcs7_data) ||
-	    !CBS_get_asn1(&content, &wrapped_data, CBS_ASN1_CONTEXT_SPECIFIC |
-						   CBS_ASN1_CONSTRUCTED | 0) ||
-	    !CBS_get_asn1(&wrapped_data, &data, CBS_ASN1_OCTETSTRING)) {
-		return "invalid PKCS#7 data";
-	}
-
-	return compare_fsverity_digest(CBS_data(&data), CBS_len(&data),
-				       expected_measurement, hash_alg);
-}
-
 #else /* OPENSSL_IS_BORINGSSL */
 
 static BIO *new_mem_buf(const void *buf, size_t size)
@@ -265,7 +234,7 @@ static BIO *new_mem_buf(const void *buf, size_t size)
 
 static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 		       EVP_PKEY *pkey, X509 *cert, const EVP_MD *md,
-		       void **sig_ret, int *sig_size_ret)
+		       u8 **sig_ret, u32 *sig_size_ret)
 {
 	/*
 	 * PKCS#7 signing flags:
@@ -285,8 +254,8 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	 */
 	int pkcs7_flags = PKCS7_BINARY | PKCS7_NOATTR | PKCS7_NOCERTS |
 			  PKCS7_PARTIAL;
-	void *sig;
-	int sig_size;
+	u8 *sig;
+	u32 sig_size;
 	BIO *bio = NULL;
 	PKCS7 *p7 = NULL;
 	bool ok = false;
@@ -333,41 +302,6 @@ out:
 	return ok;
 }
 
-static const char *
-compare_fsverity_digest_pkcs7(const void *sig, size_t sig_len,
-			      const u8 *expected_measurement,
-			      const struct fsverity_hash_alg *hash_alg)
-{
-	BIO *bio = NULL;
-	PKCS7 *p7 = NULL;
-	const char *reason = NULL;
-
-	bio = new_mem_buf(sig, sig_len);
-	if (!bio)
-		return "out of memory";
-
-	p7 = d2i_PKCS7_bio(bio, NULL);
-	if (!p7) {
-		reason = "failed to decode PKCS#7 signature";
-		goto out;
-	}
-
-	if (OBJ_obj2nid(p7->type) != NID_pkcs7_signed ||
-	    OBJ_obj2nid(p7->d.sign->contents->type) != NID_pkcs7_data) {
-		reason = "unexpected PKCS#7 content type";
-	} else {
-		const ASN1_OCTET_STRING *o = p7->d.sign->contents->d.data;
-
-		reason = compare_fsverity_digest(o->data, o->length,
-						 expected_measurement,
-						 hash_alg);
-	}
-out:
-	BIO_free(bio);
-	PKCS7_free(p7);
-	return reason;
-}
-
 #endif /* !OPENSSL_IS_BORINGSSL */
 
 /*
@@ -379,7 +313,7 @@ out:
 static bool sign_data(const void *data_to_sign, size_t data_size,
 		      const char *keyfile, const char *certfile,
 		      const struct fsverity_hash_alg *hash_alg,
-		      void **sig_ret, int *sig_size_ret)
+		      u8 **sig_ret, u32 *sig_size_ret)
 {
 	EVP_PKEY *pkey = NULL;
 	X509 *cert = NULL;
@@ -412,140 +346,294 @@ out:
 	return ok;
 }
 
-/*
- * Read a file measurement signature in PKCS#7 DER format from @signature_file,
- * validate that the signed data matches the expected measurement, then return
- * the PKCS#7 DER message in @sig_ret and @sig_size_ret.
- */
-static bool read_signature(const char *signature_file,
-			   const u8 *expected_measurement,
-			   const struct fsverity_hash_alg *hash_alg,
-			   void **sig_ret, int *sig_size_ret)
-{
-	struct filedes file = { .fd = -1 };
-	u64 filesize;
-	void *sig = NULL;
-	bool ok = false;
-	const char *reason;
-
-	if (!open_file(&file, signature_file, O_RDONLY, 0))
-		goto out;
-	if (!get_file_size(&file, &filesize))
-		goto out;
-	if (filesize <= 0) {
-		error_msg("signature file '%s' is empty", signature_file);
-		goto out;
-	}
-	if (filesize > 1000000) {
-		error_msg("signature file '%s' is too large", signature_file);
-		goto out;
-	}
-	sig = xmalloc(filesize);
-	if (!full_read(&file, sig, filesize))
-		goto out;
-
-	reason = compare_fsverity_digest_pkcs7(sig, filesize,
-					       expected_measurement, hash_alg);
-	if (reason) {
-		error_msg("signed file measurement from '%s' is invalid (%s)",
-			  signature_file, reason);
-		goto out;
-	}
-
-	printf("Using existing signed file measurement from '%s'\n",
-	       signature_file);
-	*sig_ret = sig;
-	*sig_size_ret = filesize;
-	sig = NULL;
-	ok = true;
-out:
-	filedes_close(&file);
-	free(sig);
-	return ok;
-}
-
-static bool write_signature(const char *signature_file,
-			    const void *sig, int sig_size)
+static bool write_signature(const char *filename, const u8 *sig, u32 sig_size)
 {
 	struct filedes file;
 	bool ok;
 
-	if (!open_file(&file, signature_file, O_WRONLY|O_CREAT|O_TRUNC, 0644))
+	if (!open_file(&file, filename, O_WRONLY|O_CREAT|O_TRUNC, 0644))
 		return false;
 	ok = full_write(&file, sig, sig_size);
 	ok &= filedes_close(&file);
-	if (ok)
-		printf("Wrote signed file measurement to '%s'\n",
-		       signature_file);
+	return ok;
+}
+
+#define FS_VERITY_MAX_LEVELS	64
+
+struct block_buffer {
+	u32 filled;
+	u8 *data;
+};
+
+/*
+ * Hash a block, writing the result to the next level's pending block buffer.
+ * Returns true if the next level's block became full, else false.
+ */
+static bool hash_one_block(struct hash_ctx *hash, struct block_buffer *cur,
+			   u32 block_size, const u8 *salt, u32 salt_size)
+{
+	struct block_buffer *next = cur + 1;
+
+	/* Zero-pad the block if it's shorter than block_size. */
+	memset(&cur->data[cur->filled], 0, block_size - cur->filled);
+
+	hash_init(hash);
+	hash_update(hash, salt, salt_size);
+	hash_update(hash, cur->data, block_size);
+	hash_final(hash, &next->data[next->filled]);
+
+	next->filled += hash->alg->digest_size;
+	cur->filled = 0;
+
+	return next->filled + hash->alg->digest_size > block_size;
+}
+
+/*
+ * Compute the file's Merkle tree root hash using the given hash algorithm,
+ * block size, and salt.
+ */
+static bool compute_root_hash(struct filedes *file, u64 file_size,
+			      struct hash_ctx *hash, u32 block_size,
+			      const u8 *salt, u32 salt_size, u8 *root_hash)
+{
+	const u32 hashes_per_block = block_size / hash->alg->digest_size;
+	const u32 padded_salt_size = roundup(salt_size, hash->alg->block_size);
+	u8 *padded_salt = xzalloc(padded_salt_size);
+	u64 blocks;
+	int num_levels = 0;
+	int level;
+	struct block_buffer _buffers[1 + FS_VERITY_MAX_LEVELS + 1] = {};
+	struct block_buffer *buffers = &_buffers[1];
+	u64 offset;
+	bool ok = false;
+
+	memcpy(padded_salt, salt, salt_size);
+
+	/* Compute number of levels */
+	for (blocks = DIV_ROUND_UP(file_size, block_size); blocks > 1;
+	     blocks = DIV_ROUND_UP(blocks, hashes_per_block)) {
+		ASSERT(num_levels < FS_VERITY_MAX_LEVELS);
+		num_levels++;
+	}
+
+	/*
+	 * Allocate the block buffers.  Buffer "-1" is for data blocks.
+	 * Buffers 0 <= level < num_levels are for the actual tree levels.
+	 * Buffer 'num_levels' is for the root hash.
+	 */
+	for (level = -1; level < num_levels; level++)
+		buffers[level].data = xmalloc(block_size);
+	buffers[num_levels].data = root_hash;
+
+	/* Hash each data block, also hashing the tree blocks as they fill up */
+	for (offset = 0; offset < file_size; offset += block_size) {
+		buffers[-1].filled = min(block_size, file_size - offset);
+
+		if (!full_read(file, buffers[-1].data, buffers[-1].filled))
+			goto out;
+
+		level = -1;
+		while (hash_one_block(hash, &buffers[level], block_size,
+				      padded_salt, padded_salt_size)) {
+			level++;
+			ASSERT(level < num_levels);
+		}
+	}
+	/* Finish all nonempty pending tree blocks */
+	for (level = 0; level < num_levels; level++) {
+		if (buffers[level].filled != 0)
+			hash_one_block(hash, &buffers[level], block_size,
+				       padded_salt, padded_salt_size);
+	}
+
+	/* Root hash was filled by the last call to hash_one_block() */
+	ASSERT(buffers[num_levels].filled == hash->alg->digest_size);
+	ok = true;
+out:
+	for (level = -1; level < num_levels; level++)
+		free(buffers[level].data);
+	free(padded_salt);
 	return ok;
 }
 
 /*
- * Append the signed file measurement to the output file as a PKCS7_SIGNATURE
- * extension item.
+ * Compute the fs-verity measurement of the given file.
  *
- * Return: exit status code (0 on success, nonzero on failure)
+ * The fs-verity measurement is the hash of the fsverity_descriptor, which
+ * contains the Merkle tree properties including the root hash.
  */
-int append_signed_measurement(struct filedes *out,
-			      const struct fsveritysetup_params *params,
-			      const u8 *measurement)
+static bool compute_file_measurement(const char *filename,
+				     const struct fsverity_hash_alg *hash_alg,
+				     u32 block_size, const u8 *salt,
+				     u32 salt_size, u8 *measurement)
 {
-	struct fsverity_digest_disk *data_to_sign = NULL;
-	void *sig = NULL;
-	void *extbuf = NULL;
-	void *tmp;
-	int sig_size;
-	int status;
+	struct filedes file = { .fd = -1 };
+	struct hash_ctx *hash = hash_create(hash_alg);
+	u64 file_size;
+	struct fsverity_descriptor desc;
+	bool ok = false;
 
-	if (params->signing_key_file) {
-		size_t data_size = sizeof(*data_to_sign) +
-				   params->hash_alg->digest_size;
+	if (!open_file(&file, filename, O_RDONLY, 0))
+		goto out;
 
-		/* Sign the file measurement using the given key */
+	if (!get_file_size(&file, &file_size))
+		goto out;
 
-		data_to_sign = xzalloc(data_size);
-		data_to_sign->digest_algorithm =
-			cpu_to_le16(params->hash_alg - fsverity_hash_algs);
-		data_to_sign->digest_size =
-			cpu_to_le16(params->hash_alg->digest_size);
-		memcpy(data_to_sign->digest, measurement,
-		       params->hash_alg->digest_size);
-
-		ASSERT(compare_fsverity_digest(data_to_sign, data_size,
-					measurement, params->hash_alg) == NULL);
-
-		if (!sign_data(data_to_sign, data_size,
-			       params->signing_key_file,
-			       params->signing_cert_file ?:
-			       params->signing_key_file,
-			       params->hash_alg,
-			       &sig, &sig_size))
-			goto out_err;
-
-		if (params->signature_file &&
-		    !write_signature(params->signature_file, sig, sig_size))
-			goto out_err;
-	} else {
-		/* Using a signature that was already created */
-		if (!read_signature(params->signature_file, measurement,
-				    params->hash_alg, &sig, &sig_size))
-			goto out_err;
+	if (file_size <= 0) {
+		error_msg("File must be nonempty!");
+		goto out;
 	}
 
-	tmp = extbuf = xzalloc(FSVERITY_EXTLEN(sig_size));
-	fsverity_append_extension(&tmp, FS_VERITY_EXT_PKCS7_SIGNATURE,
-				  sig, sig_size);
-	ASSERT(tmp == extbuf + FSVERITY_EXTLEN(sig_size));
-	if (!full_write(out, extbuf, FSVERITY_EXTLEN(sig_size)))
+	memset(&desc, 0, sizeof(desc));
+	desc.version = 1;
+	desc.hash_algorithm = hash_alg - fsverity_hash_algs;
+
+	ASSERT(is_power_of_2(block_size));
+	desc.log_blocksize = ilog2(block_size);
+
+	if (salt_size != 0) {
+		if (salt_size > sizeof(desc.salt)) {
+			error_msg("Salt too long (got %u bytes; max is %zu bytes)",
+				  salt_size, sizeof(desc.salt));
+			goto out;
+		}
+		memcpy(desc.salt, salt, salt_size);
+		desc.salt_size = salt_size;
+	}
+
+	desc.data_size = cpu_to_le64(file_size);
+
+	if (!compute_root_hash(&file, file_size, hash, block_size, salt,
+			       salt_size, desc.root_hash))
+		goto out;
+
+	hash_full(hash, &desc, sizeof(desc), measurement);
+	ok = true;
+out:
+	filedes_close(&file);
+	hash_free(hash);
+	return ok;
+}
+
+enum {
+	OPT_HASH_ALG,
+	OPT_BLOCK_SIZE,
+	OPT_SALT,
+	OPT_KEY,
+	OPT_CERT,
+};
+
+static const struct option longopts[] = {
+	{"hash-alg",	required_argument, NULL, OPT_HASH_ALG},
+	{"block-size",	required_argument, NULL, OPT_BLOCK_SIZE},
+	{"salt",	required_argument, NULL, OPT_SALT},
+	{"key",		required_argument, NULL, OPT_KEY},
+	{"cert",	required_argument, NULL, OPT_CERT},
+	{NULL, 0, NULL, 0}
+};
+
+/* Sign a file for fs-verity by computing its measurement, then signing it. */
+int fsverity_cmd_sign(const struct fsverity_command *cmd,
+		      int argc, char *argv[])
+{
+	const struct fsverity_hash_alg *hash_alg = NULL;
+	u32 block_size = 0;
+	u8 *salt = NULL;
+	u32 salt_size = 0;
+	const char *keyfile = NULL;
+	const char *certfile = NULL;
+	struct fsverity_signed_digest *digest = NULL;
+	u8 *sig = NULL;
+	u32 sig_size;
+	int status;
+	int c;
+
+	while ((c = getopt_long(argc, argv, "", longopts, NULL)) != -1) {
+		switch (c) {
+		case OPT_HASH_ALG:
+			if (hash_alg != NULL) {
+				error_msg("--hash-alg can only be specified once");
+				goto out_usage;
+			}
+			hash_alg = find_hash_alg_by_name(optarg);
+			if (hash_alg == NULL)
+				goto out_usage;
+			break;
+		case OPT_BLOCK_SIZE:
+			if (!parse_block_size_option(optarg, &block_size))
+				goto out_usage;
+			break;
+		case OPT_SALT:
+			if (!parse_salt_option(optarg, &salt, &salt_size))
+				goto out_usage;
+			break;
+		case OPT_KEY:
+			if (keyfile != NULL) {
+				error_msg("--key can only be specified once");
+				goto out_usage;
+			}
+			keyfile = optarg;
+			break;
+		case OPT_CERT:
+			if (certfile != NULL) {
+				error_msg("--cert can only be specified once");
+				goto out_usage;
+			}
+			certfile = optarg;
+			break;
+		default:
+			goto out_usage;
+		}
+	}
+
+	argv += optind;
+	argc -= optind;
+
+	if (argc != 2)
+		goto out_usage;
+
+	if (hash_alg == NULL)
+		hash_alg = &fsverity_hash_algs[FS_VERITY_HASH_ALG_DEFAULT];
+
+	if (block_size == 0)
+		block_size = get_default_block_size();
+
+	if (keyfile == NULL) {
+		error_msg("Missing --key argument");
+		goto out_usage;
+	}
+	if (certfile == NULL)
+		certfile = keyfile;
+
+	digest = xzalloc(sizeof(*digest) + hash_alg->digest_size);
+	memcpy(digest->magic, "FSVerity", 8);
+	digest->digest_algorithm = cpu_to_le16(hash_alg - fsverity_hash_algs);
+	digest->digest_size = cpu_to_le16(hash_alg->digest_size);
+
+	if (!compute_file_measurement(argv[0], hash_alg, block_size,
+				      salt, salt_size, digest->digest))
 		goto out_err;
+
+	if (!sign_data(digest, sizeof(*digest) + hash_alg->digest_size,
+		       keyfile, certfile, hash_alg, &sig, &sig_size))
+		goto out_err;
+
+	if (!write_signature(argv[1], sig, sig_size))
+		goto out_err;
+
 	status = 0;
 out:
-	free(data_to_sign);
+	free(salt);
+	free(digest);
 	free(sig);
-	free(extbuf);
 	return status;
 
 out_err:
 	status = 1;
+	goto out;
+
+out_usage:
+	usage(cmd, stderr);
+	status = 2;
 	goto out;
 }
