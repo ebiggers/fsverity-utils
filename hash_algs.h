@@ -9,7 +9,6 @@
 struct fsverity_hash_alg {
 	const char *name;
 	unsigned int digest_size;
-	bool cryptographic;
 	struct hash_ctx *(*create_ctx)(const struct fsverity_hash_alg *alg);
 };
 

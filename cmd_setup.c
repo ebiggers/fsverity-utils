@@ -535,14 +535,6 @@ int fsverity_cmd_setup(const struct fsverity_command *cmd,
 		goto out_err;
 	}
 
-	if ((params.signing_key_file || params.signature_file) &&
-	    !params.hash_alg->cryptographic) {
-		error_msg("Signing a file using '%s' checksums does not make sense\n"
-			  "       because '%s' is not a cryptographically secure hash algorithm.",
-			  params.hash_alg->name, params.hash_alg->name);
-		goto out_err;
-	}
-
 	if (!load_elisions_and_patches(&elide_opts, &patch_opts, &params))
 		goto out_err;
 

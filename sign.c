@@ -395,7 +395,6 @@ static bool sign_data(const void *data_to_sign, size_t data_size,
 		goto out;
 
 	OpenSSL_add_all_digests();
-	ASSERT(hash_alg->cryptographic);
 	md = EVP_get_digestbyname(hash_alg->name);
 	if (!md) {
 		fprintf(stderr,
