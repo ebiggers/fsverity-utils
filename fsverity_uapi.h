@@ -57,8 +57,6 @@ struct fsverity_descriptor {
 #define FS_VERITY_EXT_ROOT_HASH		1
 #define FS_VERITY_EXT_SALT		2
 #define FS_VERITY_EXT_PKCS7_SIGNATURE	3
-#define FS_VERITY_EXT_ELIDE		4
-#define FS_VERITY_EXT_PATCH		5
 
 /* Header of each extension (variable-length metadata item) */
 struct fsverity_extension {
@@ -89,18 +87,6 @@ struct fsverity_digest_disk {
 	__le16 digest_algorithm;
 	__le16 digest_size;
 	__u8 digest[];
-};
-
-/* FS_VERITY_EXT_ELIDE payload */
-struct fsverity_extension_elide {
-	__le64 offset;
-	__le64 length;
-};
-
-/* FS_VERITY_EXT_PATCH payload */
-struct fsverity_extension_patch {
-	__le64 offset;
-	/* followed by variable-length patch data */
 };
 
 /* Fields stored at the very end of the file */

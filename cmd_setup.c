@@ -25,8 +25,6 @@ enum {
 	OPT_SIGNING_KEY,
 	OPT_SIGNING_CERT,
 	OPT_SIGNATURE,
-	OPT_ELIDE,
-	OPT_PATCH,
 };
 
 static const struct option longopts[] = {
@@ -36,8 +34,6 @@ static const struct option longopts[] = {
 	{"signing-key",		required_argument, NULL, OPT_SIGNING_KEY},
 	{"signing-cert",	required_argument, NULL, OPT_SIGNING_CERT},
 	{"signature",		required_argument, NULL, OPT_SIGNATURE},
-	{"elide",		required_argument, NULL, OPT_ELIDE},
-	{"patch",		required_argument, NULL, OPT_PATCH},
 	{NULL, 0, NULL, 0}
 };
 
@@ -247,7 +243,6 @@ static int append_fsverity_descriptor(const struct fsveritysetup_params *params,
 	desc_auth_len += FSVERITY_EXTLEN(params->hash_alg->digest_size);
 	if (params->saltlen)
 		desc_auth_len += FSVERITY_EXTLEN(params->saltlen);
-	desc_auth_len += total_elide_patch_ext_length(params);
 	desc = buf = xzalloc(desc_auth_len);
 
 	memcpy(desc->magic, FS_VERITY_MAGIC, sizeof(desc->magic));
@@ -263,7 +258,6 @@ static int append_fsverity_descriptor(const struct fsveritysetup_params *params,
 	auth_ext_count = 1; /* root hash */
 	if (params->saltlen)
 		auth_ext_count++;
-	auth_ext_count += params->num_elisions_and_patches;
 	desc->auth_ext_count = cpu_to_le16(auth_ext_count);
 
 	buf += sizeof(*desc);
@@ -272,7 +266,6 @@ static int append_fsverity_descriptor(const struct fsveritysetup_params *params,
 	if (params->saltlen)
 		fsverity_append_extension(&buf, FS_VERITY_EXT_SALT,
 					  params->salt, params->saltlen);
-	append_elide_patch_exts(&buf, params);
 	ASSERT(buf - (void *)desc == desc_auth_len);
 
 	hash_update(hash, desc, desc_auth_len);
@@ -340,10 +333,9 @@ static int fsveritysetup(const char *infile, const char *outfile,
 	struct filedes _out = { .fd = -1 };
 	struct filedes _tmp = { .fd = -1 };
 	struct hash_ctx *hash = NULL;
-	struct filedes *in = &_in, *out = &_out, *src;
+	struct filedes *in = &_in, *out = &_out;
 	u64 filesize;
 	u64 aligned_filesize;
-	u64 src_filesize;
 	u64 tree_end_offset;
 	u8 root_hash[FS_VERITY_MAX_DIGEST_SIZE];
 	u8 measurement[FS_VERITY_MAX_DIGEST_SIZE];
@@ -385,22 +377,10 @@ static int fsveritysetup(const char *infile, const char *outfile,
 	if (!write_zeroes(out, aligned_filesize - filesize))
 		goto out_err;
 
-	if (params->num_elisions_and_patches) {
-		/* Merkle tree is built over temporary elided/patched file */
-		src = &_tmp;
-		if (!apply_elisions_and_patches(params, in, filesize,
-						src, &src_filesize))
-			goto out_err;
-	} else {
-		/* Merkle tree is built over original file */
-		src = out;
-		src_filesize = aligned_filesize;
-	}
-
 	hash = hash_create(params->hash_alg);
 
 	/* Build the file's Merkle tree and calculate its root hash */
-	status = build_merkle_tree(params, hash, src, src_filesize,
+	status = build_merkle_tree(params, hash, out, aligned_filesize,
 				   out, aligned_filesize,
 				   &tree_end_offset, root_hash);
 	if (status)
@@ -454,8 +434,6 @@ int fsverity_cmd_setup(const struct fsverity_command *cmd,
 	struct fsveritysetup_params params = {
 		.hash_alg = DEFAULT_HASH_ALG,
 	};
-	STRING_LIST(elide_opts);
-	STRING_LIST(patch_opts);
 	int c;
 	int status;
 
@@ -490,12 +468,6 @@ int fsverity_cmd_setup(const struct fsverity_command *cmd,
 			break;
 		case OPT_SIGNATURE:
 			params.signature_file = optarg;
-			break;
-		case OPT_ELIDE:
-			string_list_append(&elide_opts, optarg);
-			break;
-		case OPT_PATCH:
-			string_list_append(&patch_opts, optarg);
 			break;
 		default:
 			goto out_usage;
@@ -535,15 +507,9 @@ int fsverity_cmd_setup(const struct fsverity_command *cmd,
 		goto out_err;
 	}
 
-	if (!load_elisions_and_patches(&elide_opts, &patch_opts, &params))
-		goto out_err;
-
 	status = fsveritysetup(argv[0], argv[argc - 1], &params);
 out:
 	free(params.salt);
-	free_elisions_and_patches(&params);
-	string_list_destroy(&elide_opts);
-	string_list_destroy(&patch_opts);
 	return status;
 
 out_err:

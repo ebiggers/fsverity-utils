@@ -41,7 +41,6 @@ static const struct fsverity_command {
 "    fsverity setup INFILE [OUTFILE]\n"
 "                   [--hash=HASH_ALG] [--salt=SALT] [--signing-key=KEYFILE]\n"
 "                   [--signing-cert=CERTFILE] [--signature=SIGFILE]\n"
-"                   [--patch=OFFSET,PATCHFILE] [--elide=OFFSET,LENGTH]\n"
 	}
 };
 
