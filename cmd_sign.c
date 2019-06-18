@@ -479,11 +479,6 @@ static bool compute_file_measurement(const char *filename,
 	if (!get_file_size(&file, &file_size))
 		goto out;
 
-	if (file_size <= 0) {
-		error_msg("File must be nonempty!");
-		goto out;
-	}
-
 	memset(&desc, 0, sizeof(desc));
 	desc.version = 1;
 	desc.hash_algorithm = hash_alg - fsverity_hash_algs;
@@ -503,7 +498,9 @@ static bool compute_file_measurement(const char *filename,
 
 	desc.data_size = cpu_to_le64(file_size);
 
-	if (!compute_root_hash(&file, file_size, hash, block_size, salt,
+	/* Root hash of empty file is all 0's */
+	if (file_size != 0 &&
+	    !compute_root_hash(&file, file_size, hash, block_size, salt,
 			       salt_size, desc.root_hash))
 		goto out;
 
