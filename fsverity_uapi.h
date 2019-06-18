@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
- * fs-verity (file-based verity) support
+ * fs-verity user API
+ *
+ * These ioctls can be used on filesystems that support fs-verity.  See the
+ * "User API" section of Documentation/filesystems/fsverity.rst.
  *
  * Copyright 2019 Google LLC
  */
@@ -31,7 +34,7 @@ struct fsverity_digest {
 	__u8 digest[];
 };
 
-#define FS_IOC_ENABLE_VERITY		_IOW('f', 133, struct fsverity_enable_arg)
-#define FS_IOC_MEASURE_VERITY		_IOWR('f', 134, struct fsverity_digest)
+#define FS_IOC_ENABLE_VERITY	_IOW('f', 133, struct fsverity_enable_arg)
+#define FS_IOC_MEASURE_VERITY	_IOWR('f', 134, struct fsverity_digest)
 
 #endif /* _UAPI_LINUX_FSVERITY_H */
