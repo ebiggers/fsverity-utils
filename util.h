@@ -58,12 +58,6 @@ typedef uint64_t u64;
 
 #define DIV_ROUND_UP(n, d)	(((n) + (d) - 1) / (d))
 
-/*
- * Round 'v' up to the next 'alignment'-byte aligned boundary.
- * 'alignment' must be a power of 2.
- */
-#define ALIGN(v, alignment)	(((v) + ((alignment) - 1)) & ~((alignment) - 1))
-
 static inline bool is_power_of_2(unsigned long n)
 {
 	return n != 0 && ((n & (n - 1)) == 0);
