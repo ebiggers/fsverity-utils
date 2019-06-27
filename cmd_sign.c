@@ -540,6 +540,7 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 	const char *keyfile = NULL;
 	const char *certfile = NULL;
 	struct fsverity_signed_digest *digest = NULL;
+	char digest_hex[FS_VERITY_MAX_DIGEST_SIZE * 2 + 1];
 	u8 *sig = NULL;
 	u32 sig_size;
 	int status;
@@ -618,6 +619,9 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 	if (!write_signature(argv[1], sig, sig_size))
 		goto out_err;
 
+	bin2hex(digest->digest, hash_alg->digest_size, digest_hex);
+	printf("Signed file \"%s\" (%s:%s)\n", argv[0], hash_alg->name,
+	       digest_hex);
 	status = 0;
 out:
 	free(salt);
