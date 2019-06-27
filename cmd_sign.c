@@ -620,7 +620,7 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 		goto out_err;
 
 	bin2hex(digest->digest, hash_alg->digest_size, digest_hex);
-	printf("Signed file \"%s\" (%s:%s)\n", argv[0], hash_alg->name,
+	printf("Signed file '%s' (%s:%s)\n", argv[0], hash_alg->name,
 	       digest_hex);
 	status = 0;
 out:
