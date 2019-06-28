@@ -117,9 +117,8 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 		       u8 **sig_ret, u32 *sig_size_ret)
 {
 	CBB out, outer_seq, wrapped_seq, seq, digest_algos_set, digest_algo,
-		null, content_info, issuer_and_serial, signed_data,
-		wrapped_signed_data, signer_infos, signer_info, sign_algo,
-		signature;
+		null, content_info, issuer_and_serial, signer_infos,
+		signer_info, sign_algo, signature;
 	EVP_MD_CTX md_ctx;
 	u8 *name_der = NULL, *sig = NULL, *pkcs7_data = NULL;
 	size_t pkcs7_data_len, sig_len;
@@ -174,13 +173,6 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	    !CBB_add_asn1(&digest_algo, &null, CBS_ASN1_NULL) ||
 	    !CBB_add_asn1(&seq, &content_info, CBS_ASN1_SEQUENCE) ||
 	    !OBJ_nid2cbb(&content_info, NID_pkcs7_data) ||
-	    !CBB_add_asn1(
-		&content_info, &signed_data,
-		CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0) ||
-	    !CBB_add_asn1(&signed_data, &wrapped_signed_data,
-			  CBS_ASN1_OCTETSTRING) ||
-	    !CBB_add_bytes(&wrapped_signed_data, (const u8 *)data_to_sign,
-			   data_size) ||
 	    !CBB_add_asn1(&seq, &signer_infos, CBS_ASN1_SET) ||
 	    !CBB_add_asn1(&signer_infos, &signer_info, CBS_ASN1_SEQUENCE) ||
 	    !CBB_add_asn1_uint64(&signer_info, 1 /* version */) ||
@@ -241,6 +233,8 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	 *
 	 * - PKCS7_BINARY	signing binary data, so skip MIME translation
 	 *
+	 * - PKCS7_DETACHED	omit the signed data (include signature only)
+	 *
 	 * - PKCS7_NOATTR	omit extra authenticated attributes, such as
 	 *			SMIMECapabilities
 	 *
@@ -252,8 +246,8 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	 *			algorithm from the default of SHA-1.  Requires
 	 *			OpenSSL 1.0.0 or later.
 	 */
-	int pkcs7_flags = PKCS7_BINARY | PKCS7_NOATTR | PKCS7_NOCERTS |
-			  PKCS7_PARTIAL;
+	int pkcs7_flags = PKCS7_BINARY | PKCS7_DETACHED | PKCS7_NOATTR |
+			  PKCS7_NOCERTS | PKCS7_PARTIAL;
 	u8 *sig;
 	u32 sig_size;
 	BIO *bio = NULL;
@@ -307,8 +301,8 @@ out:
 /*
  * Sign the specified @data_to_sign of length @data_size bytes using the private
  * key in @keyfile, the certificate in @certfile, and the hash algorithm
- * @hash_alg.  Returns the DER-formatted PKCS#7 signature, with the signed data
- * included (not detached), in @sig_ret and @sig_size_ret.
+ * @hash_alg.  Returns the DER-formatted PKCS#7 signature in @sig_ret and
+ * @sig_size_ret.
  */
 static bool sign_data(const void *data_to_sign, size_t data_size,
 		      const char *keyfile, const char *certfile,
