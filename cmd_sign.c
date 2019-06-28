@@ -407,7 +407,8 @@ static bool compute_root_hash(struct filedes *file, u64 file_size,
 	u64 offset;
 	bool ok = false;
 
-	memcpy(padded_salt, salt, salt_size);
+	if (salt_size != 0)
+		memcpy(padded_salt, salt, salt_size);
 
 	/* Compute number of levels */
 	for (blocks = DIV_ROUND_UP(file_size, block_size); blocks > 1;
