@@ -62,7 +62,7 @@ static void usage_all(FILE *fp)
 "\n"
 "Available hash algorithms: ", fp);
 	show_all_hash_algs(fp);
-	fputs("\nSee `man fsverity` for more details.\n", fp);
+	putc('\n', fp);
 }
 
 static void usage_cmd(const struct fsverity_command *cmd, FILE *fp)
