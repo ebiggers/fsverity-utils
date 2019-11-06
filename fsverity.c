@@ -78,7 +78,7 @@ void usage(const struct fsverity_command *cmd, FILE *fp)
 		usage_all(fp);
 }
 
-#define PACKAGE_VERSION    "v0.0-alpha"
+#define PACKAGE_VERSION    "v1.0"
 #define PACKAGE_BUGREPORT  "linux-fscrypt@vger.kernel.org"
 
 static void show_version(void)
