@@ -7,6 +7,10 @@
  * Written by Eric Biggers.
  */
 
+#include "commands.h"
+#include "fsverity_uapi.h"
+#include "hash_algs.h"
+
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
@@ -16,10 +20,6 @@
 #include <openssl/pkcs7.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "commands.h"
-#include "fsverity_uapi.h"
-#include "hash_algs.h"
 
 /*
  * Merkle tree properties.  The file measurement is the hash of this structure

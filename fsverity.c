@@ -7,13 +7,13 @@
  * Written by Eric Biggers.
  */
 
+#include "commands.h"
+#include "hash_algs.h"
+
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "commands.h"
-#include "hash_algs.h"
 
 static const struct fsverity_command {
 	const char *name;

@@ -2,9 +2,9 @@
 #ifndef HASH_ALGS_H
 #define HASH_ALGS_H
 
-#include <stdio.h>
-
 #include "util.h"
+
+#include <stdio.h>
 
 struct fsverity_hash_alg {
 	const char *name;

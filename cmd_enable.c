@@ -7,16 +7,16 @@
  * Written by Eric Biggers.
  */
 
+#include "commands.h"
+#include "fsverity_uapi.h"
+#include "hash_algs.h"
+
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-
-#include "commands.h"
-#include "fsverity_uapi.h"
-#include "hash_algs.h"
 
 static bool parse_hash_alg_option(const char *arg, u32 *alg_ptr)
 {

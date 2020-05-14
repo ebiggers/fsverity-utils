@@ -7,12 +7,12 @@
  * Written by Eric Biggers.
  */
 
+#include "fsverity_uapi.h"
+#include "hash_algs.h"
+
 #include <openssl/evp.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "fsverity_uapi.h"
-#include "hash_algs.h"
 
 /* ========== libcrypto (OpenSSL) wrappers ========== */
 

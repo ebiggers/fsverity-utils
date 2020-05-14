@@ -7,6 +7,8 @@
  * Written by Eric Biggers.
  */
 
+#include "util.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -16,8 +18,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include "util.h"
 
 /* ========== Memory allocation ========== */
 

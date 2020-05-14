@@ -2,9 +2,9 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
-#include <stdio.h>
-
 #include "util.h"
+
+#include <stdio.h>
 
 struct fsverity_command;
 
