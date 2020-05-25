@@ -5,15 +5,12 @@
  * Copyright 2018 Google LLC
  */
 
-#include "util.h"
+#include "utils.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -45,7 +42,7 @@ char *xstrdup(const char *s)
 
 /* ========== Error messages and assertions ========== */
 
-void do_error_msg(const char *format, va_list va, int err)
+static void do_error_msg(const char *format, va_list va, int err)
 {
 	fputs("ERROR: ", stderr);
 	vfprintf(stderr, format, va);

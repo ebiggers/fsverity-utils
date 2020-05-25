@@ -5,12 +5,9 @@
  * Copyright 2018 Google LLC
  */
 
-#include "commands.h"
-#include "hash_algs.h"
+#include "fsverity.h"
 
 #include <limits.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 static const struct fsverity_command {
@@ -45,6 +42,17 @@ static const struct fsverity_command {
 	}
 };
 
+static void show_all_hash_algs(FILE *fp)
+{
+	u32 alg_num = 1;
+	const char *name;
+
+	fprintf(fp, "Available hash algorithms:");
+	while ((name = libfsverity_get_hash_name(alg_num++)) != NULL)
+		fprintf(fp, " %s", name);
+	putc('\n', fp);
+}
+
 static void usage_all(FILE *fp)
 {
 	int i;
@@ -57,10 +65,8 @@ static void usage_all(FILE *fp)
 "  Standard options:\n"
 "    fsverity --help\n"
 "    fsverity --version\n"
-"\n"
-"Available hash algorithms: ", fp);
+"\n", fp);
 	show_all_hash_algs(fp);
-	putc('\n', fp);
 }
 
 static void usage_cmd(const struct fsverity_command *cmd, FILE *fp)
@@ -125,6 +131,31 @@ static const struct fsverity_command *find_command(const char *name)
 	return NULL;
 }
 
+bool parse_hash_alg_option(const char *arg, u32 *alg_ptr)
+{
+	char *end;
+	unsigned long n = strtoul(arg, &end, 10);
+
+	if (*alg_ptr != 0) {
+		error_msg("--hash-alg can only be specified once");
+		return false;
+	}
+
+	/* Specified by number? */
+	if (n > 0 && n < INT32_MAX && *end == '\0') {
+		*alg_ptr = n;
+		return true;
+	}
+
+	/* Specified by name? */
+	*alg_ptr = libfsverity_find_hash_alg_by_name(arg);
+	if (*alg_ptr)
+		return true;
+	error_msg("unknown hash algorithm: '%s'", arg);
+	show_all_hash_algs(stderr);
+	return false;
+}
+
 bool parse_block_size_option(const char *arg, u32 *size_ptr)
 {
 	char *end;
@@ -171,9 +202,16 @@ u32 get_default_block_size(void)
 	return n;
 }
 
+static void print_libfsverity_error(const char *msg)
+{
+	error_msg("%s", msg);
+}
+
 int main(int argc, char *argv[])
 {
 	const struct fsverity_command *cmd;
+
+	libfsverity_set_error_callback(print_libfsverity_error);
 
 	if (argc < 2) {
 		error_msg("no command specified");

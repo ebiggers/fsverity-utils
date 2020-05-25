@@ -5,8 +5,7 @@
  * Copyright 2018 Google LLC
  */
 
-#include "fsverity_uapi.h"
-#include "hash_algs.h"
+#include "lib_private.h"
 
 #include <openssl/evp.h>
 #include <stdlib.h>
@@ -23,29 +22,29 @@ struct openssl_hash_ctx {
 static void openssl_digest_init(struct hash_ctx *_ctx)
 {
 	struct openssl_hash_ctx *ctx = (void *)_ctx;
+	int ret;
 
-	if (EVP_DigestInit_ex(ctx->md_ctx, ctx->md, NULL) != 1)
-		fatal_error("EVP_DigestInit_ex() failed for algorithm '%s'",
-			    ctx->base.alg->name);
+	ret = EVP_DigestInit_ex(ctx->md_ctx, ctx->md, NULL);
+	BUG_ON(ret != 1);
 }
 
 static void openssl_digest_update(struct hash_ctx *_ctx,
 				  const void *data, size_t size)
 {
 	struct openssl_hash_ctx *ctx = (void *)_ctx;
+	int ret;
 
-	if (EVP_DigestUpdate(ctx->md_ctx, data, size) != 1)
-		fatal_error("EVP_DigestUpdate() failed for algorithm '%s'",
-			    ctx->base.alg->name);
+	ret = EVP_DigestUpdate(ctx->md_ctx, data, size);
+	BUG_ON(ret != 1);
 }
 
 static void openssl_digest_final(struct hash_ctx *_ctx, u8 *digest)
 {
 	struct openssl_hash_ctx *ctx = (void *)_ctx;
+	int ret;
 
-	if (EVP_DigestFinal_ex(ctx->md_ctx, digest, NULL) != 1)
-		fatal_error("EVP_DigestFinal_ex() failed for algorithm '%s'",
-			    ctx->base.alg->name);
+	ret = EVP_DigestFinal_ex(ctx->md_ctx, digest, NULL);
+	BUG_ON(ret != 1);
 }
 
 static void openssl_digest_ctx_free(struct hash_ctx *_ctx)
@@ -66,7 +65,10 @@ openssl_digest_ctx_create(const struct fsverity_hash_alg *alg, const EVP_MD *md)
 {
 	struct openssl_hash_ctx *ctx;
 
-	ctx = xzalloc(sizeof(*ctx));
+	ctx = libfsverity_zalloc(sizeof(*ctx));
+	if (!ctx)
+		return NULL;
+
 	ctx->base.alg = alg;
 	ctx->base.init = openssl_digest_init;
 	ctx->base.update = openssl_digest_update;
@@ -78,13 +80,22 @@ openssl_digest_ctx_create(const struct fsverity_hash_alg *alg, const EVP_MD *md)
 	 * with older OpenSSL versions.
 	 */
 	ctx->md_ctx = EVP_MD_CTX_create();
-	if (!ctx->md_ctx)
-		fatal_error("out of memory");
+	if (!ctx->md_ctx) {
+		libfsverity_error_msg("failed to allocate EVP_MD_CTX");
+		goto err1;
+	}
 
 	ctx->md = md;
-	ASSERT(EVP_MD_size(md) == alg->digest_size);
+	if (WARN_ON(EVP_MD_size(md) != alg->digest_size))
+		goto err2;
 
 	return &ctx->base;
+
+err2:
+	EVP_MD_CTX_destroy(ctx->md_ctx);
+err1:
+	free(ctx);
+	return NULL;
 }
 
 static struct hash_ctx *create_sha256_ctx(const struct fsverity_hash_alg *alg)
@@ -97,9 +108,42 @@ static struct hash_ctx *create_sha512_ctx(const struct fsverity_hash_alg *alg)
 	return openssl_digest_ctx_create(alg, EVP_sha512());
 }
 
+/* ========== Hash utilities ========== */
+
+void libfsverity_hash_init(struct hash_ctx *ctx)
+{
+	ctx->init(ctx);
+}
+
+void libfsverity_hash_update(struct hash_ctx *ctx, const void *data,
+			     size_t size)
+{
+	ctx->update(ctx, data, size);
+}
+
+void libfsverity_hash_final(struct hash_ctx *ctx, u8 *digest)
+{
+	ctx->final(ctx, digest);
+}
+
+/* ->init(), ->update(), and ->final() all in one step */
+void libfsverity_hash_full(struct hash_ctx *ctx, const void *data, size_t size,
+			   u8 *digest)
+{
+	libfsverity_hash_init(ctx);
+	libfsverity_hash_update(ctx, data, size);
+	libfsverity_hash_final(ctx, digest);
+}
+
+void libfsverity_free_hash_ctx(struct hash_ctx *ctx)
+{
+	if (ctx)
+		ctx->free(ctx);
+}
+
 /* ========== Hash algorithm definitions ========== */
 
-const struct fsverity_hash_alg fsverity_hash_algs[] = {
+static const struct fsverity_hash_alg libfsverity_hash_algs[] = {
 	[FS_VERITY_HASH_ALG_SHA256] = {
 		.name = "sha256",
 		.digest_size = 32,
@@ -114,48 +158,45 @@ const struct fsverity_hash_alg fsverity_hash_algs[] = {
 	},
 };
 
-const struct fsverity_hash_alg *find_hash_alg_by_name(const char *name)
+LIBEXPORT u32
+libfsverity_find_hash_alg_by_name(const char *name)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
-		if (fsverity_hash_algs[i].name &&
-		    !strcmp(name, fsverity_hash_algs[i].name))
-			return &fsverity_hash_algs[i];
+	if (!name)
+		return 0;
+
+	for (i = 0; i < ARRAY_SIZE(libfsverity_hash_algs); i++) {
+		if (libfsverity_hash_algs[i].name &&
+		    !strcmp(name, libfsverity_hash_algs[i].name))
+			return i;
 	}
-	error_msg("unknown hash algorithm: '%s'", name);
-	fputs("Available hash algorithms: ", stderr);
-	show_all_hash_algs(stderr);
-	putc('\n', stderr);
+	return 0;
+}
+
+const struct fsverity_hash_alg *libfsverity_find_hash_alg_by_num(u32 alg_num)
+{
+	if (alg_num < ARRAY_SIZE(libfsverity_hash_algs) &&
+	    libfsverity_hash_algs[alg_num].name)
+		return &libfsverity_hash_algs[alg_num];
+
 	return NULL;
 }
 
-const struct fsverity_hash_alg *find_hash_alg_by_num(unsigned int num)
+LIBEXPORT int
+libfsverity_get_digest_size(u32 alg_num)
 {
-	if (num < ARRAY_SIZE(fsverity_hash_algs) &&
-	    fsverity_hash_algs[num].name)
-		return &fsverity_hash_algs[num];
+	const struct fsverity_hash_alg *alg =
+		libfsverity_find_hash_alg_by_num(alg_num);
 
-	return NULL;
+	return alg ? alg->digest_size : -1;
 }
 
-void show_all_hash_algs(FILE *fp)
+LIBEXPORT const char *
+libfsverity_get_hash_name(u32 alg_num)
 {
-	int i;
-	const char *sep = "";
+	const struct fsverity_hash_alg *alg =
+		libfsverity_find_hash_alg_by_num(alg_num);
 
-	for (i = 0; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
-		if (fsverity_hash_algs[i].name) {
-			fprintf(fp, "%s%s", sep, fsverity_hash_algs[i].name);
-			sep = ", ";
-		}
-	}
-}
-
-/* ->init(), ->update(), and ->final() all in one step */
-void hash_full(struct hash_ctx *ctx, const void *data, size_t size, u8 *digest)
-{
-	hash_init(ctx);
-	hash_update(ctx, data, size);
-	hash_final(ctx, digest);
+	return alg ? alg->name : NULL;
 }

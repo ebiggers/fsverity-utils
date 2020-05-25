@@ -1,5 +1,11 @@
-fsverity
+*.a
 *.o
-tags
+*.patch
+*.so
+*.so.*
+/.build-config
+/fsverity
+/test_*
 cscope.*
 ncscope.*
+tags

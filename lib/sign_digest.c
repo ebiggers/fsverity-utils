@@ -1,45 +1,71 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * sign_digest.c
+ * Implementation of libfsverity_sign_digest().
  *
  * Copyright 2018 Google LLC
+ * Copyright (C) 2020 Facebook
  */
 
-#include "hash_algs.h"
-#include "sign.h"
+#include "lib_private.h"
 
 #include <limits.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/pkcs7.h>
+#include <string.h>
+
+/*
+ * Format in which verity file measurements are signed.  This is the same as
+ * 'struct fsverity_digest', except here some magic bytes are prepended to
+ * provide some context about what is being signed in case the same key is used
+ * for non-fsverity purposes, and here the fields have fixed endianness.
+ */
+struct fsverity_signed_digest {
+	char magic[8];			/* must be "FSVerity" */
+	__le16 digest_algorithm;
+	__le16 digest_size;
+	__u8 digest[];
+};
+
+static int print_openssl_err_cb(const char *str,
+				size_t len __attribute__((unused)),
+				void *u __attribute__((unused)))
+{
+	libfsverity_error_msg("%s", str);
+	return 1;
+}
 
 static void __printf(1, 2) __cold
 error_msg_openssl(const char *format, ...)
 {
+	int saved_errno = errno;
 	va_list va;
 
 	va_start(va, format);
-	do_error_msg(format, va, 0);
+	libfsverity_do_error_msg(format, va, 0);
 	va_end(va);
 
 	if (ERR_peek_error() == 0)
 		return;
 
-	fprintf(stderr, "OpenSSL library errors:\n");
-	ERR_print_errors_fp(stderr);
+	libfsverity_error_msg("OpenSSL library errors:");
+	ERR_print_errors_cb(print_openssl_err_cb, NULL);
+	errno = saved_errno;
 }
 
 /* Read a PEM PKCS#8 formatted private key */
-static EVP_PKEY *read_private_key(const char *keyfile)
+static int read_private_key(const char *keyfile, EVP_PKEY **pkey_ret)
 {
 	BIO *bio;
 	EVP_PKEY *pkey;
+	int err;
 
+	errno = 0;
 	bio = BIO_new_file(keyfile, "r");
 	if (!bio) {
 		error_msg_openssl("can't open '%s' for reading", keyfile);
-		return NULL;
+		return errno ? -errno : -EIO;
 	}
 
 	pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
@@ -47,38 +73,51 @@ static EVP_PKEY *read_private_key(const char *keyfile)
 		error_msg_openssl("Failed to parse private key file '%s'.\n"
 				  "       Note: it must be in PEM PKCS#8 format.",
 				  keyfile);
+		err = -EBADMSG;
+		goto out;
 	}
+	*pkey_ret = pkey;
+	err = 0;
+out:
 	BIO_free(bio);
-	return pkey;
+	return err;
 }
 
 /* Read a PEM X.509 formatted certificate */
-static X509 *read_certificate(const char *certfile)
+static int read_certificate(const char *certfile, X509 **cert_ret)
 {
 	BIO *bio;
 	X509 *cert;
+	int err;
 
+	errno = 0;
 	bio = BIO_new_file(certfile, "r");
 	if (!bio) {
 		error_msg_openssl("can't open '%s' for reading", certfile);
-		return NULL;
+		return errno ? -errno : -EIO;
 	}
 	cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
 	if (!cert) {
 		error_msg_openssl("Failed to parse X.509 certificate file '%s'.\n"
 				  "       Note: it must be in PEM format.",
 				  certfile);
+		err = -EBADMSG;
+		goto out;
 	}
+	*cert_ret = cert;
+	err = 0;
+out:
 	BIO_free(bio);
-	return cert;
+	return err;
 }
 
 #ifdef OPENSSL_IS_BORINGSSL
 
-static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
-		       EVP_PKEY *pkey, X509 *cert, const EVP_MD *md,
-		       u8 **sig_ret, u32 *sig_size_ret)
+static int sign_pkcs7(const void *data_to_sign, size_t data_size,
+		      EVP_PKEY *pkey, X509 *cert, const EVP_MD *md,
+		      u8 **sig_ret, size_t *sig_size_ret)
 {
+	BIGNUM *serial;
 	CBB out, outer_seq, wrapped_seq, seq, digest_algos_set, digest_algo,
 		null, content_info, issuer_and_serial, signer_infos,
 		signer_info, sign_algo, signature;
@@ -86,31 +125,39 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	u8 *name_der = NULL, *sig = NULL, *pkcs7_data = NULL;
 	size_t pkcs7_data_len, sig_len;
 	int name_der_len, sig_nid;
-	bool ok = false;
+	int err;
 
 	EVP_MD_CTX_init(&md_ctx);
-	BIGNUM *serial = ASN1_INTEGER_to_BN(X509_get_serialNumber(cert), NULL);
+	serial = ASN1_INTEGER_to_BN(X509_get_serialNumber(cert), NULL);
 
 	if (!CBB_init(&out, 1024)) {
-		error_msg("out of memory");
+		error_msg_openssl("out of memory");
+		err = -ENOMEM;
 		goto out;
 	}
 
 	name_der_len = i2d_X509_NAME(X509_get_subject_name(cert), &name_der);
 	if (name_der_len < 0) {
 		error_msg_openssl("i2d_X509_NAME failed");
+		err = -EINVAL;
 		goto out;
 	}
 
 	if (!EVP_DigestSignInit(&md_ctx, NULL, md, NULL, pkey)) {
 		error_msg_openssl("EVP_DigestSignInit failed");
+		err = -EINVAL;
 		goto out;
 	}
 
 	sig_len = EVP_PKEY_size(pkey);
-	sig = xmalloc(sig_len);
+	sig = libfsverity_zalloc(sig_len);
+	if (!sig) {
+		err = -ENOMEM;
+		goto out;
+	}
 	if (!EVP_DigestSign(&md_ctx, sig, &sig_len, data_to_sign, data_size)) {
 		error_msg_openssl("EVP_DigestSign failed");
+		err = -EINVAL;
 		goto out;
 	}
 
@@ -153,12 +200,17 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	    !CBB_add_bytes(&signature, sig, sig_len) ||
 	    !CBB_finish(&out, &pkcs7_data, &pkcs7_data_len)) {
 		error_msg_openssl("failed to construct PKCS#7 data");
+		err = -EINVAL;
 		goto out;
 	}
 
-	*sig_ret = xmemdup(pkcs7_data, pkcs7_data_len);
+	*sig_ret = libfsverity_memdup(pkcs7_data, pkcs7_data_len);
+	if (!*sig_ret) {
+		err = -ENOMEM;
+		goto out;
+	}
 	*sig_size_ret = pkcs7_data_len;
-	ok = true;
+	err = 0;
 out:
 	BN_free(serial);
 	EVP_MD_CTX_cleanup(&md_ctx);
@@ -166,7 +218,7 @@ out:
 	free(sig);
 	OPENSSL_free(name_der);
 	OPENSSL_free(pkcs7_data);
-	return ok;
+	return err;
 }
 
 #else /* OPENSSL_IS_BORINGSSL */
@@ -175,7 +227,9 @@ static BIO *new_mem_buf(const void *buf, size_t size)
 {
 	BIO *bio;
 
-	ASSERT(size <= INT_MAX);
+	if (WARN_ON(size > INT_MAX))
+		return NULL;
+
 	/*
 	 * Prior to OpenSSL 1.1.0, BIO_new_mem_buf() took a non-const pointer,
 	 * despite still marking the resulting bio as read-only.  So cast away
@@ -187,9 +241,9 @@ static BIO *new_mem_buf(const void *buf, size_t size)
 	return bio;
 }
 
-static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
-		       EVP_PKEY *pkey, X509 *cert, const EVP_MD *md,
-		       u8 **sig_ret, u32 *sig_size_ret)
+static int sign_pkcs7(const void *data_to_sign, size_t data_size,
+		      EVP_PKEY *pkey, X509 *cert, const EVP_MD *md,
+		      u8 **sig_ret, size_t *sig_size_ret)
 {
 	/*
 	 * PKCS#7 signing flags:
@@ -215,25 +269,30 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	u32 sig_size;
 	BIO *bio = NULL;
 	PKCS7 *p7 = NULL;
-	bool ok = false;
+	int err;
 
 	bio = new_mem_buf(data_to_sign, data_size);
-	if (!bio)
+	if (!bio) {
+		err = -ENOMEM;
 		goto out;
+	}
 
 	p7 = PKCS7_sign(NULL, NULL, NULL, bio, pkcs7_flags);
 	if (!p7) {
 		error_msg_openssl("failed to initialize PKCS#7 signature object");
+		err = -EINVAL;
 		goto out;
 	}
 
 	if (!PKCS7_sign_add_signer(p7, cert, pkey, md, pkcs7_flags)) {
 		error_msg_openssl("failed to add signer to PKCS#7 signature object");
+		err = -EINVAL;
 		goto out;
 	}
 
 	if (PKCS7_final(p7, bio, pkcs7_flags) != 1) {
 		error_msg_openssl("failed to finalize PKCS#7 signature");
+		err = -EINVAL;
 		goto out;
 	}
 
@@ -241,64 +300,100 @@ static bool sign_pkcs7(const void *data_to_sign, size_t data_size,
 	bio = BIO_new(BIO_s_mem());
 	if (!bio) {
 		error_msg_openssl("out of memory");
+		err = -ENOMEM;
 		goto out;
 	}
 
 	if (i2d_PKCS7_bio(bio, p7) != 1) {
 		error_msg_openssl("failed to DER-encode PKCS#7 signature object");
+		err = -EINVAL;
 		goto out;
 	}
 
 	sig_size = BIO_get_mem_data(bio, &sig);
-	*sig_ret = xmemdup(sig, sig_size);
+	*sig_ret = libfsverity_memdup(sig, sig_size);
+	if (!*sig_ret) {
+		err = -ENOMEM;
+		goto out;
+	}
 	*sig_size_ret = sig_size;
-	ok = true;
+	err = 0;
 out:
 	PKCS7_free(p7);
 	BIO_free(bio);
-	return ok;
+	return err;
 }
 
 #endif /* !OPENSSL_IS_BORINGSSL */
 
-/*
- * Sign the specified @data_to_sign of length @data_size bytes using the private
- * key in @keyfile, the certificate in @certfile, and the hash algorithm
- * @hash_alg.  Returns the DER-formatted PKCS#7 signature in @sig_ret and
- * @sig_size_ret.
- */
-bool sign_data(const void *data_to_sign, size_t data_size,
-	       const char *keyfile, const char *certfile,
-	       const struct fsverity_hash_alg *hash_alg,
-	       u8 **sig_ret, u32 *sig_size_ret)
+LIBEXPORT int
+libfsverity_sign_digest(const struct libfsverity_digest *digest,
+			const struct libfsverity_signature_params *sig_params,
+			u8 **sig_ret, size_t *sig_size_ret)
 {
+	int i;
+	const struct fsverity_hash_alg *hash_alg;
 	EVP_PKEY *pkey = NULL;
 	X509 *cert = NULL;
 	const EVP_MD *md;
-	bool ok = false;
+	struct fsverity_signed_digest *d = NULL;
+	int err;
 
-	pkey = read_private_key(keyfile);
-	if (!pkey)
+	if (!digest || !sig_params || !sig_ret || !sig_size_ret)  {
+		libfsverity_error_msg("missing required parameters for sign_digest");
+		return -EINVAL;
+	}
+
+	if (!sig_params->keyfile || !sig_params->certfile) {
+		libfsverity_error_msg("keyfile and certfile must be specified");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(sig_params->reserved); i++) {
+		if (sig_params->reserved[i]) {
+			libfsverity_error_msg("reserved bits set in signature_params");
+			return -EINVAL;
+		}
+	}
+
+	hash_alg = libfsverity_find_hash_alg_by_num(digest->digest_algorithm);
+	if (!hash_alg || digest->digest_size != hash_alg->digest_size) {
+		libfsverity_error_msg("malformed fsverity digest");
+		return -EINVAL;
+	}
+
+	err = read_private_key(sig_params->keyfile, &pkey);
+	if (err)
 		goto out;
 
-	cert = read_certificate(certfile);
-	if (!cert)
+	err = read_certificate(sig_params->certfile, &cert);
+	if (err)
 		goto out;
 
 	OpenSSL_add_all_digests();
 	md = EVP_get_digestbyname(hash_alg->name);
 	if (!md) {
-		fprintf(stderr,
-			"Warning: '%s' algorithm not found in OpenSSL library.\n"
-			"         Falling back to SHA-256 signature.\n",
-			hash_alg->name);
-		md = EVP_sha256();
+		libfsverity_error_msg("'%s' algorithm not found in OpenSSL library",
+				      hash_alg->name);
+		err = -ENOPKG;
+		goto out;
 	}
 
-	ok = sign_pkcs7(data_to_sign, data_size, pkey, cert, md,
-			sig_ret, sig_size_ret);
-out:
+	d = libfsverity_zalloc(sizeof(*d) + digest->digest_size);
+	if (!d) {
+		err = -ENOMEM;
+		goto out;
+	}
+	memcpy(d->magic, "FSVerity", 8);
+	d->digest_algorithm = cpu_to_le16(digest->digest_algorithm);
+	d->digest_size = cpu_to_le16(digest->digest_size);
+	memcpy(d->digest, digest->digest, digest->digest_size);
+
+	err = sign_pkcs7(d, sizeof(*d) + digest->digest_size,
+			 pkey, cert, md, sig_ret, sig_size_ret);
+ out:
 	EVP_PKEY_free(pkey);
 	X509_free(cert);
-	return ok;
+	free(d);
+	return err;
 }

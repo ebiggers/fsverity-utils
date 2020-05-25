@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * compute_digest.c
+ * Implementation of libfsverity_compute_digest().
  *
  * Copyright 2018 Google LLC
+ * Copyright (C) 2020 Facebook
  */
 
-#include "sign.h"
+#include "lib_private.h"
 
-#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -47,10 +47,10 @@ static bool hash_one_block(struct hash_ctx *hash, struct block_buffer *cur,
 	/* Zero-pad the block if it's shorter than block_size. */
 	memset(&cur->data[cur->filled], 0, block_size - cur->filled);
 
-	hash_init(hash);
-	hash_update(hash, salt, salt_size);
-	hash_update(hash, cur->data, block_size);
-	hash_final(hash, &next->data[next->filled]);
+	libfsverity_hash_init(hash);
+	libfsverity_hash_update(hash, salt, salt_size);
+	libfsverity_hash_update(hash, cur->data, block_size);
+	libfsverity_hash_final(hash, &next->data[next->filled]);
 
 	next->filled += hash->alg->digest_size;
 	cur->filled = 0;
@@ -62,28 +62,42 @@ static bool hash_one_block(struct hash_ctx *hash, struct block_buffer *cur,
  * Compute the file's Merkle tree root hash using the given hash algorithm,
  * block size, and salt.
  */
-static bool compute_root_hash(struct filedes *file, u64 file_size,
-			      struct hash_ctx *hash, u32 block_size,
-			      const u8 *salt, u32 salt_size, u8 *root_hash)
+static int compute_root_hash(void *fd, libfsverity_read_fn_t read_fn,
+			     u64 file_size, struct hash_ctx *hash,
+			     u32 block_size, const u8 *salt, u32 salt_size,
+			     u8 *root_hash)
 {
 	const u32 hashes_per_block = block_size / hash->alg->digest_size;
 	const u32 padded_salt_size = roundup(salt_size, hash->alg->block_size);
-	u8 *padded_salt = xzalloc(padded_salt_size);
+	u8 *padded_salt = NULL;
 	u64 blocks;
 	int num_levels = 0;
 	int level;
 	struct block_buffer _buffers[1 + FS_VERITY_MAX_LEVELS + 1] = {};
 	struct block_buffer *buffers = &_buffers[1];
 	u64 offset;
-	bool ok = false;
+	int err = 0;
 
-	if (salt_size != 0)
+	/* Root hash of empty file is all 0's */
+	if (file_size == 0) {
+		memset(root_hash, 0, hash->alg->digest_size);
+		return 0;
+	}
+
+	if (salt_size != 0) {
+		padded_salt = libfsverity_zalloc(padded_salt_size);
+		if (!padded_salt)
+			return -ENOMEM;
 		memcpy(padded_salt, salt, salt_size);
+	}
 
 	/* Compute number of levels */
 	for (blocks = DIV_ROUND_UP(file_size, block_size); blocks > 1;
 	     blocks = DIV_ROUND_UP(blocks, hashes_per_block)) {
-		ASSERT(num_levels < FS_VERITY_MAX_LEVELS);
+		if (WARN_ON(num_levels >= FS_VERITY_MAX_LEVELS)) {
+			err = -EINVAL;
+			goto out;
+		}
 		num_levels++;
 	}
 
@@ -92,22 +106,33 @@ static bool compute_root_hash(struct filedes *file, u64 file_size,
 	 * Buffers 0 <= level < num_levels are for the actual tree levels.
 	 * Buffer 'num_levels' is for the root hash.
 	 */
-	for (level = -1; level < num_levels; level++)
-		buffers[level].data = xmalloc(block_size);
+	for (level = -1; level < num_levels; level++) {
+		buffers[level].data = libfsverity_zalloc(block_size);
+		if (!buffers[level].data) {
+			err = -ENOMEM;
+			goto out;
+		}
+	}
 	buffers[num_levels].data = root_hash;
 
 	/* Hash each data block, also hashing the tree blocks as they fill up */
 	for (offset = 0; offset < file_size; offset += block_size) {
 		buffers[-1].filled = min(block_size, file_size - offset);
 
-		if (!full_read(file, buffers[-1].data, buffers[-1].filled))
+		err = read_fn(fd, buffers[-1].data, buffers[-1].filled);
+		if (err) {
+			libfsverity_error_msg("error reading file");
 			goto out;
+		}
 
 		level = -1;
 		while (hash_one_block(hash, &buffers[level], block_size,
 				      padded_salt, padded_salt_size)) {
 			level++;
-			ASSERT(level < num_levels);
+			if (WARN_ON(level >= num_levels)) {
+				err = -EINVAL;
+				goto out;
+			}
 		}
 	}
 	/* Finish all nonempty pending tree blocks */
@@ -118,67 +143,98 @@ static bool compute_root_hash(struct filedes *file, u64 file_size,
 	}
 
 	/* Root hash was filled by the last call to hash_one_block() */
-	ASSERT(buffers[num_levels].filled == hash->alg->digest_size);
-	ok = true;
+	if (WARN_ON(buffers[num_levels].filled != hash->alg->digest_size)) {
+		err = -EINVAL;
+		goto out;
+	}
+	err = 0;
 out:
 	for (level = -1; level < num_levels; level++)
 		free(buffers[level].data);
 	free(padded_salt);
-	return ok;
+	return err;
 }
 
-/*
- * Compute the fs-verity measurement of the given file.
- *
- * The fs-verity measurement is the hash of the fsverity_descriptor, which
- * contains the Merkle tree properties including the root hash.
- */
-bool compute_file_measurement(const char *filename,
-			      const struct fsverity_hash_alg *hash_alg,
-			      u32 block_size, const u8 *salt,
-			      u32 salt_size, u8 *measurement)
+LIBEXPORT int
+libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
+			   const struct libfsverity_merkle_tree_params *params,
+			   struct libfsverity_digest **digest_ret)
 {
-	struct filedes file = { .fd = -1 };
-	struct hash_ctx *hash = hash_create(hash_alg);
-	u64 file_size;
+	const struct fsverity_hash_alg *hash_alg;
+	struct hash_ctx *hash = NULL;
+	struct libfsverity_digest *digest;
 	struct fsverity_descriptor desc;
-	bool ok = false;
+	int i;
+	int err;
 
-	if (!open_file(&file, filename, O_RDONLY, 0))
-		goto out;
+	if (!read_fn || !params || !digest_ret) {
+		libfsverity_error_msg("missing required parameters for compute_digest");
+		return -EINVAL;
+	}
+	if (params->version != 1) {
+		libfsverity_error_msg("unsupported version (%u)",
+				      params->version);
+		return -EINVAL;
+	}
+	if (!is_power_of_2(params->block_size)) {
+		libfsverity_error_msg("unsupported block size (%u)",
+				      params->block_size);
+		return -EINVAL;
+	}
+	if (params->salt_size > sizeof(desc.salt)) {
+		libfsverity_error_msg("unsupported salt size (%u)",
+				      params->salt_size);
+		return -EINVAL;
+	}
+	if (params->salt_size && !params->salt)  {
+		libfsverity_error_msg("salt_size specified, but salt is NULL");
+		return -EINVAL;
+	}
+	for (i = 0; i < ARRAY_SIZE(params->reserved); i++) {
+		if (params->reserved[i]) {
+			libfsverity_error_msg("reserved bits set in merkle_tree_params");
+			return -EINVAL;
+		}
+	}
 
-	if (!get_file_size(&file, &file_size))
-		goto out;
+	hash_alg = libfsverity_find_hash_alg_by_num(params->hash_algorithm);
+	if (!hash_alg) {
+		libfsverity_error_msg("unknown hash algorithm: %u",
+				      params->hash_algorithm);
+		return -EINVAL;
+	}
+
+	hash = hash_alg->create_ctx(hash_alg);
+	if (!hash)
+		return -ENOMEM;
 
 	memset(&desc, 0, sizeof(desc));
 	desc.version = 1;
-	desc.hash_algorithm = hash_alg - fsverity_hash_algs;
-
-	ASSERT(is_power_of_2(block_size));
-	desc.log_blocksize = ilog2(block_size);
-
-	if (salt_size != 0) {
-		if (salt_size > sizeof(desc.salt)) {
-			error_msg("Salt too long (got %u bytes; max is %zu bytes)",
-				  salt_size, sizeof(desc.salt));
-			goto out;
-		}
-		memcpy(desc.salt, salt, salt_size);
-		desc.salt_size = salt_size;
+	desc.hash_algorithm = params->hash_algorithm;
+	desc.log_blocksize = ilog2(params->block_size);
+	desc.data_size = cpu_to_le64(params->file_size);
+	if (params->salt_size != 0) {
+		memcpy(desc.salt, params->salt, params->salt_size);
+		desc.salt_size = params->salt_size;
 	}
 
-	desc.data_size = cpu_to_le64(file_size);
-
-	/* Root hash of empty file is all 0's */
-	if (file_size != 0 &&
-	    !compute_root_hash(&file, file_size, hash, block_size, salt,
-			       salt_size, desc.root_hash))
+	err = compute_root_hash(fd, read_fn, params->file_size, hash,
+				params->block_size, params->salt,
+				params->salt_size, desc.root_hash);
+	if (err)
 		goto out;
 
-	hash_full(hash, &desc, sizeof(desc), measurement);
-	ok = true;
+	digest = libfsverity_zalloc(sizeof(*digest) + hash_alg->digest_size);
+	if (!digest) {
+		err = -ENOMEM;
+		goto out;
+	}
+	digest->digest_algorithm = params->hash_algorithm;
+	digest->digest_size = hash_alg->digest_size;
+	libfsverity_hash_full(hash, &desc, sizeof(desc), digest->digest);
+	*digest_ret = digest;
+	err = 0;
 out:
-	filedes_close(&file);
-	hash_free(hash);
-	return ok;
+	libfsverity_free_hash_ctx(hash);
+	return err;
 }
