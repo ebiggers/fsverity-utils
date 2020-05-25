@@ -2,7 +2,7 @@
 /*
  * fs-verity hash algorithms
  *
- * Copyright (C) 2018 Google LLC
+ * Copyright 2018 Google LLC
  */
 
 #include "fsverity_uapi.h"

@@ -2,7 +2,7 @@
 /*
  * The 'fsverity sign' command
  *
- * Copyright (C) 2018 Google LLC
+ * Copyright 2018 Google LLC
  */
 
 #include "commands.h"

@@ -2,7 +2,7 @@
 /*
  * Utility functions for the 'fsverity' program
  *
- * Copyright (C) 2018 Google LLC
+ * Copyright 2018 Google LLC
  */
 
 #include "util.h"
