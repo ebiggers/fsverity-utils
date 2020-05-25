@@ -1,9 +1,9 @@
 EXE := fsverity
 CFLAGS := -O2 -Wall
-CPPFLAGS := -D_FILE_OFFSET_BITS=64
+CPPFLAGS := -D_FILE_OFFSET_BITS=64 -I.
 LDLIBS := -lcrypto
 DESTDIR := /usr/local
-SRC := $(wildcard *.c)
+SRC := $(wildcard *.c) $(wildcard lib/*.c)
 OBJ := $(SRC:.c=.o)
 HDRS := $(wildcard *.h)
 
