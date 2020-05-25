@@ -3,8 +3,6 @@
  * fs-verity userspace tool
  *
  * Copyright (C) 2018 Google LLC
- *
- * Written by Eric Biggers.
  */
 
 #include "commands.h"

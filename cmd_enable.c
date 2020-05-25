@@ -3,8 +3,6 @@
  * The 'fsverity enable' command
  *
  * Copyright (C) 2018 Google LLC
- *
- * Written by Eric Biggers.
  */
 
 #include "commands.h"

@@ -3,8 +3,6 @@
  * fs-verity hash algorithms
  *
  * Copyright (C) 2018 Google LLC
- *
- * Written by Eric Biggers.
  */
 
 #include "fsverity_uapi.h"
