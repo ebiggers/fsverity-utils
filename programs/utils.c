@@ -176,16 +176,18 @@ static int hex2bin_char(char c)
 
 bool hex2bin(const char *hex, u8 *bin, size_t bin_len)
 {
+	size_t i;
+
 	if (strlen(hex) != 2 * bin_len)
 		return false;
 
-	while (bin_len--) {
+	for (i = 0; i < bin_len; i++) {
 		int hi = hex2bin_char(*hex++);
 		int lo = hex2bin_char(*hex++);
 
 		if (hi < 0 || lo < 0)
 			return false;
-		*bin++ = (hi << 4) | lo;
+		bin[i] = (hi << 4) | lo;
 	}
 	return true;
 }
@@ -201,10 +203,11 @@ static char bin2hex_char(u8 nibble)
 
 void bin2hex(const u8 *bin, size_t bin_len, char *hex)
 {
-	while (bin_len--) {
-		*hex++ = bin2hex_char(*bin >> 4);
-		*hex++ = bin2hex_char(*bin & 0xf);
-		bin++;
+	size_t i;
+
+	for (i = 0; i < bin_len; i++) {
+		*hex++ = bin2hex_char(bin[i] >> 4);
+		*hex++ = bin2hex_char(bin[i] & 0xf);
 	}
 	*hex = '\0';
 }
