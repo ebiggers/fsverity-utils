@@ -144,10 +144,18 @@ all:$(DEFAULT_TARGETS)
 
 test_programs:$(TEST_PROGRAMS)
 
-check:test_programs
+check:fsverity test_programs
 	for prog in $(TEST_PROGRAMS); do \
-		./$$prog || exit 1; \
+		$(TEST_WRAPPER_PROG) ./$$prog || exit 1; \
 	done
+	./fsverity --help > /dev/null
+	./fsverity --version > /dev/null
+	./fsverity sign fsverity fsverity.sig \
+		--key=testdata/key.pem --cert=testdata/cert.pem > /dev/null
+	./fsverity sign fsverity fsverity.sig --hash=sha512 --block-size=512 \
+		--salt=12345678 \
+		--key=testdata/key.pem --cert=testdata/cert.pem > /dev/null
+	rm -f fsverity.sig
 	@echo "All tests passed!"
 
 install:all
@@ -174,7 +182,7 @@ help:
 
 clean:
 	rm -f $(DEFAULT_TARGETS) $(TEST_PROGRAMS) \
-		lib/*.o programs/*.o .build-config
+		lib/*.o programs/*.o .build-config fsverity.sig
 
 FORCE:
 

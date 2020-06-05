@@ -5,6 +5,7 @@
 *.so.*
 /.build-config
 /fsverity
+/fsverity.sig
 /test_*
 cscope.*
 ncscope.*
