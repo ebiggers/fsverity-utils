@@ -144,6 +144,8 @@ all:$(DEFAULT_TARGETS)
 
 test_programs:$(TEST_PROGRAMS)
 
+# This just runs some quick, portable tests.  Use scripts/run-tests.sh if you
+# want to run the full tests.
 check:fsverity test_programs
 	for prog in $(TEST_PROGRAMS); do \
 		$(TEST_WRAPPER_PROG) ./$$prog || exit 1; \
