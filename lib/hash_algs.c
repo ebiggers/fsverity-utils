@@ -143,7 +143,7 @@ void libfsverity_free_hash_ctx(struct hash_ctx *ctx)
 
 /* ========== Hash algorithm definitions ========== */
 
-static const struct fsverity_hash_alg libfsverity_hash_algs[] = {
+static const struct fsverity_hash_alg fsverity_hash_algs[] = {
 	[FS_VERITY_HASH_ALG_SHA256] = {
 		.name = "sha256",
 		.digest_size = 32,
@@ -166,9 +166,9 @@ libfsverity_find_hash_alg_by_name(const char *name)
 	if (!name)
 		return 0;
 
-	for (i = 0; i < ARRAY_SIZE(libfsverity_hash_algs); i++) {
-		if (libfsverity_hash_algs[i].name &&
-		    !strcmp(name, libfsverity_hash_algs[i].name))
+	for (i = 0; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
+		if (fsverity_hash_algs[i].name &&
+		    !strcmp(name, fsverity_hash_algs[i].name))
 			return i;
 	}
 	return 0;
@@ -176,9 +176,9 @@ libfsverity_find_hash_alg_by_name(const char *name)
 
 const struct fsverity_hash_alg *libfsverity_find_hash_alg_by_num(u32 alg_num)
 {
-	if (alg_num < ARRAY_SIZE(libfsverity_hash_algs) &&
-	    libfsverity_hash_algs[alg_num].name)
-		return &libfsverity_hash_algs[alg_num];
+	if (alg_num < ARRAY_SIZE(fsverity_hash_algs) &&
+	    fsverity_hash_algs[alg_num].name)
+		return &fsverity_hash_algs[alg_num];
 
 	return NULL;
 }
