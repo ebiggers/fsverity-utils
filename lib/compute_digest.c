@@ -164,7 +164,6 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
 	struct hash_ctx *hash = NULL;
 	struct libfsverity_digest *digest;
 	struct fsverity_descriptor desc;
-	int i;
 	int err;
 
 	if (!read_fn || !params || !digest_ret) {
@@ -190,11 +189,12 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
 		libfsverity_error_msg("salt_size specified, but salt is NULL");
 		return -EINVAL;
 	}
-	for (i = 0; i < ARRAY_SIZE(params->reserved); i++) {
-		if (params->reserved[i]) {
-			libfsverity_error_msg("reserved bits set in merkle_tree_params");
-			return -EINVAL;
-		}
+	if (!libfsverity_mem_is_zeroed(params->reserved1,
+				       sizeof(params->reserved1)) ||
+	    !libfsverity_mem_is_zeroed(params->reserved2,
+				       sizeof(params->reserved2))) {
+		libfsverity_error_msg("reserved bits set in merkle_tree_params");
+		return -EINVAL;
 	}
 
 	hash_alg = libfsverity_find_hash_alg_by_num(params->hash_algorithm);

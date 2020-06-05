@@ -107,3 +107,15 @@ void libfsverity_bug_on(const char *condition, const char *file, int line)
 		"Non-recoverable, aborting program.\n", condition, file, line);
 	abort();
 }
+
+bool libfsverity_mem_is_zeroed(const void *mem, size_t size)
+{
+	const u8 *p = mem;
+	size_t i;
+
+	for (i = 0; i < size; i++) {
+		if (p[i])
+			return false;
+	}
+	return true;
+}

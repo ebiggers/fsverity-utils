@@ -23,7 +23,8 @@ struct libfsverity_merkle_tree_params {
 	uint32_t salt_size;		/* salt size in bytes (0 if unsalted) */
 	uint64_t file_size;		/* file size in bytes		*/
 	const uint8_t *salt;		/* pointer to salt (optional)	*/
-	uint64_t reserved[11];		/* must be 0			*/
+	uint64_t reserved1[8];		/* must be 0 */
+	uintptr_t reserved2[8];		/* must be 0 */
 };
 
 struct libfsverity_digest {
@@ -35,7 +36,8 @@ struct libfsverity_digest {
 struct libfsverity_signature_params {
 	const char *keyfile;		/* path to key file (PEM format) */
 	const char *certfile;		/* path to certificate (PEM format) */
-	uint64_t reserved[11];		/* must be 0 */
+	uint64_t reserved1[8];		/* must be 0 */
+	uintptr_t reserved2[8];		/* must be 0 */
 };
 
 /*

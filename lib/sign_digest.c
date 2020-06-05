@@ -331,7 +331,6 @@ libfsverity_sign_digest(const struct libfsverity_digest *digest,
 			const struct libfsverity_signature_params *sig_params,
 			u8 **sig_ret, size_t *sig_size_ret)
 {
-	int i;
 	const struct fsverity_hash_alg *hash_alg;
 	EVP_PKEY *pkey = NULL;
 	X509 *cert = NULL;
@@ -349,11 +348,12 @@ libfsverity_sign_digest(const struct libfsverity_digest *digest,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(sig_params->reserved); i++) {
-		if (sig_params->reserved[i]) {
-			libfsverity_error_msg("reserved bits set in signature_params");
-			return -EINVAL;
-		}
+	if (!libfsverity_mem_is_zeroed(sig_params->reserved1,
+				       sizeof(sig_params->reserved1)) ||
+	    !libfsverity_mem_is_zeroed(sig_params->reserved2,
+				       sizeof(sig_params->reserved2))) {
+		libfsverity_error_msg("reserved bits set in signature_params");
+		return -EINVAL;
 	}
 
 	hash_alg = libfsverity_find_hash_alg_by_num(digest->digest_algorithm);

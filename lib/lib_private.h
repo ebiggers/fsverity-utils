@@ -80,4 +80,6 @@ libfsverity_bug_on(const char *condition, const char *file, int line);
 	c;								\
 })
 
+bool libfsverity_mem_is_zeroed(const void *mem, size_t size);
+
 #endif /* LIB_LIB_PRIVATE_H */
