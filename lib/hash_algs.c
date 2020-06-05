@@ -166,7 +166,7 @@ libfsverity_find_hash_alg_by_name(const char *name)
 	if (!name)
 		return 0;
 
-	for (i = 0; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
+	for (i = 1; i < ARRAY_SIZE(fsverity_hash_algs); i++) {
 		if (fsverity_hash_algs[i].name &&
 		    !strcmp(name, fsverity_hash_algs[i].name))
 			return i;
