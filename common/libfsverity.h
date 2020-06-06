@@ -9,6 +9,10 @@
 #ifndef LIBFSVERITY_H
 #define LIBFSVERITY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -130,5 +134,9 @@ const char *libfsverity_get_hash_name(uint32_t alg_num);
  * @cb: the callback function
  */
 void libfsverity_set_error_callback(void (*cb)(const char *msg));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBFSVERITY_H */

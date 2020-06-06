@@ -53,6 +53,20 @@ if nm libfsverity.so | grep ' T ' | grep -v " libfsverity_"; then
 	fail "Some exported symbols are not prefixed with \"libfsverity_\""
 fi
 
+log "Test using libfsverity from C++ program"
+cat > /tmp/libfsverity_test.cc <<EOF
+#include <libfsverity.h>
+#include <iostream>
+int main()
+{
+	std::cout << libfsverity_get_digest_size(FS_VERITY_HASH_ALG_SHA256) << std::endl;
+}
+EOF
+c++ -Wall -Werror /tmp/libfsverity_test.cc -Icommon -L. -lfsverity \
+	-o /tmp/libfsverity_test
+[ "$(LD_LIBRARY_PATH=. /tmp/libfsverity_test)" = "32" ]
+rm /tmp/libfsverity_test*
+
 log "Build and test with gcc"
 $MAKE CC=gcc check
 
@@ -106,3 +120,5 @@ $MAKE CC=gcc CFLAGS="-fanalyzer -Werror" all test_programs
 
 log "Run shellcheck"
 shellcheck scripts/*.sh 1>&2
+
+log "All tests passed!"
