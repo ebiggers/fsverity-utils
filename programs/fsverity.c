@@ -82,20 +82,18 @@ void usage(const struct fsverity_command *cmd, FILE *fp)
 		usage_all(fp);
 }
 
-#define PACKAGE_VERSION    "v1.0"
-#define PACKAGE_BUGREPORT  "linux-fscrypt@vger.kernel.org"
-
 static void show_version(void)
 {
-	static const char * const str =
-"fsverity " PACKAGE_VERSION "\n"
+	printf(
+"fsverity v%d.%d\n"
 "Copyright 2018 Google LLC\n"
 "License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl.html>.\n"
 "This is free software: you are free to change and redistribute it.\n"
 "There is NO WARRANTY, to the extent permitted by law.\n"
 "\n"
-"Report bugs to " PACKAGE_BUGREPORT ".\n";
-	fputs(str, stdout);
+"Report bugs to linux-fscrypt@vger.kernel.org.\n",
+		FSVERITY_UTILS_MAJOR_VERSION,
+		FSVERITY_UTILS_MINOR_VERSION);
 }
 
 static void handle_common_options(int argc, char *argv[],
