@@ -1,7 +1,9 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2020 Google LLC
 
 set -e -u -o pipefail
+cd "$(dirname "$0")/.."
 
 if [ $# != 1 ]; then
 	echo "Usage: $0 VERS" 1>&2
@@ -11,6 +13,10 @@ fi
 
 VERS=$1
 PKG=fsverity-utils-$VERS
+
+git checkout -f
+git clean -fdx
+./scripts/run-tests.sh
 
 major=$(echo "$VERS" | cut -d. -f1)
 minor=$(echo "$VERS" | cut -d. -f2)
@@ -23,7 +29,7 @@ git tag --sign "v$VERS" --message="$PKG"
 git archive "v$VERS" --prefix="$PKG/" > "$PKG.tar"
 rm -rf "$PKG"
 tar xf "$PKG.tar"
-( cd "$PKG" && make all )
+( cd "$PKG" && make check )
 rm -r "$PKG"
 
 gpg --detach-sign --armor "$PKG.tar"
