@@ -1,5 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2020 Google LLC
 
 set -e -u -o pipefail
 

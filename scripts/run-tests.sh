@@ -1,5 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2020 Google LLC
 #
 # Test script for fsverity-utils.  Runs 'make check' in lots of configurations,
 # runs static analysis, and does a few other tests.
@@ -19,6 +20,9 @@ fail() {
 	echo "FAIL: $*" 1>&2
 	exit 1
 }
+
+TMPDIR=$(mktemp -d -t libfsverity_test.XXXXXXXXX)
+trap 'rm -r "$TMPDIR"' EXIT
 
 # Both stdout and stderr go to log file.
 # Only stderr goes to terminal.
@@ -54,7 +58,7 @@ if nm libfsverity.so | grep ' T ' | grep -v " libfsverity_"; then
 fi
 
 log "Test using libfsverity from C++ program"
-cat > /tmp/libfsverity_test.cc <<EOF
+cat > "$TMPDIR/test.cc" <<EOF
 #include <libfsverity.h>
 #include <iostream>
 int main()
@@ -62,10 +66,44 @@ int main()
 	std::cout << libfsverity_get_digest_size(FS_VERITY_HASH_ALG_SHA256) << std::endl;
 }
 EOF
-c++ -Wall -Werror /tmp/libfsverity_test.cc -Icommon -L. -lfsverity \
-	-o /tmp/libfsverity_test
-[ "$(LD_LIBRARY_PATH=. /tmp/libfsverity_test)" = "32" ]
-rm /tmp/libfsverity_test*
+c++ -Wall -Werror "$TMPDIR/test.cc" -Icommon -L. -lfsverity -o "$TMPDIR/test"
+[ "$(LD_LIBRARY_PATH=. "$TMPDIR/test")" = "32" ]
+rm "${TMPDIR:?}"/*
+
+log "Check that build doesn't produce untracked files"
+$MAKE all test_programs
+if git status --short | grep -q '^??'; then
+	git status
+	fail "Build produced untracked files (check 'git status').  Missing gitignore entry?"
+fi
+
+log "Test that 'make uninstall' uninstalls all files"
+make DESTDIR="$TMPDIR" install
+if [ "$(find "$TMPDIR" -type f -o -type l | wc -l)" = 0 ]; then
+	fail "'make install' didn't install any files"
+fi
+make DESTDIR="$TMPDIR" uninstall
+if [ "$(find "$TMPDIR" -type f -o -type l | wc -l)" != 0 ]; then
+	fail "'make uninstall' didn't uninstall all files"
+fi
+rm -r "${TMPDIR:?}"/*
+
+log "Check that all files have license and copyright info"
+list="$TMPDIR/filelist"
+filter_license_info() {
+	# files to exclude from license and copyright info checks
+	grep -E -v '(\.gitignore|COPYING|NEWS|README|testdata|fsverity_uapi\.h)'
+}
+git grep -L 'SPDX-License-Identifier: GPL-2\.0-or-later' \
+	| filter_license_info > "$list" || true
+if [ -s "$list" ]; then
+	fail "The following files are missing an appropriate SPDX license identifier: $(<"$list")"
+fi
+git grep -L '\<Copyright\>' | filter_license_info > "$list" || true
+if [ -s "$list" ]; then
+	fail "The following files are missing a copyright statement: $(<"$list")"
+fi
+rm "$list"
 
 log "Build and test with gcc"
 $MAKE CC=gcc check
@@ -73,14 +111,20 @@ $MAKE CC=gcc check
 log "Build and test with gcc (-Wall + -Werror)"
 $MAKE CC=gcc CFLAGS="-Wall -Werror" check
 
+log "Build and test with gcc (-O3)"
+$MAKE CC=gcc CFLAGS="-O3 -Wall -Werror" check
+
 log "Build and test with gcc (32-bit)"
-$MAKE CC=gcc CFLAGS="-m32" check
+$MAKE CC=gcc CFLAGS="-m32 -O2 -Wall -Werror" check
 
 log "Build and test with clang"
 $MAKE CC=clang check
 
 log "Build and test with clang (-Wall + -Werror)"
 $MAKE CC=clang CFLAGS="-Wall -Werror" check
+
+log "Build and test with clang (-O3)"
+$MAKE CC=clang CFLAGS="-O3 -Wall -Werror" check
 
 log "Build and test with clang + UBSAN"
 $MAKE CC=clang CFLAGS="-fsanitize=undefined -fno-sanitize-recover=undefined" \
@@ -92,6 +136,9 @@ $MAKE CC=clang CFLAGS="-fsanitize=address -fno-sanitize-recover=address" check
 log "Build and test with clang + unsigned integer overflow sanitizer"
 $MAKE CC=clang CFLAGS="-fsanitize=unsigned-integer-overflow -fno-sanitize-recover=unsigned-integer-overflow" \
 	check
+
+log "Build and test with clang + CFI"
+$MAKE CC=clang CFLAGS="-fsanitize=cfi -flto -fvisibility=hidden" check
 
 log "Build and test with valgrind"
 $MAKE TEST_WRAPPER_PROG="valgrind --quiet --error-exitcode=100 --leak-check=full --errors-for-leak-kinds=all" \
