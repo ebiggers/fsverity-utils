@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2020 Google LLC
 #
 # Use 'make help' to list available targets.
 #
@@ -140,6 +141,14 @@ $(TEST_PROGRAMS): %: programs/%.o $(PROG_COMMON_OBJ) libfsverity.a
 
 ##############################################################################
 
+SPECIAL_TARGETS := all test_programs check install uninstall help clean
+
+FORCE:
+
+.PHONY: $(SPECIAL_TARGETS) FORCE
+
+.DEFAULT_GOAL = all
+
 all:$(DEFAULT_TARGETS)
 
 test_programs:$(TEST_PROGRAMS)
@@ -178,16 +187,11 @@ uninstall:
 help:
 	@echo "Available targets:"
 	@echo "------------------"
-	@for target in $(DEFAULT_TARGETS) $(TEST_PROGRAMS); do \
+	@for target in $(DEFAULT_TARGETS) $(TEST_PROGRAMS) $(SPECIAL_TARGETS); \
+	do \
 		echo $$target; \
 	done
 
 clean:
 	rm -f $(DEFAULT_TARGETS) $(TEST_PROGRAMS) \
 		lib/*.o programs/*.o .build-config fsverity.sig
-
-FORCE:
-
-.PHONY: all test_programs check install uninstall help clean FORCE
-
-.DEFAULT_GOAL = all
