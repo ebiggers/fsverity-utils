@@ -36,7 +36,7 @@ struct libfsverity_merkle_tree_params {
 
 struct libfsverity_digest {
 	uint16_t digest_algorithm;	/* one of FS_VERITY_HASH_ALG_* */
-	uint16_t digest_size;		/* size of digest in bytes */
+	uint16_t digest_size;		/* digest size in bytes */
 	uint8_t digest[];		/* the actual digest */
 };
 
@@ -60,21 +60,21 @@ typedef int (*libfsverity_read_fn_t)(void *fd, void *buf, size_t count);
 
 /**
  * libfsverity_compute_digest() - Compute digest of a file
- *          An fsverity digest is the root of the Merkle tree of the file.
- *          Not to be confused with a traditional file digests computed over
- *          the entire file.
+ *          An fsverity_digest (also called a "file measurement") is the root of
+ *          a file's Merkle tree.  Not to be confused with a traditional file
+ *          digest computed over the entire file.
  * @fd: context that will be passed to @read_fn
  * @read_fn: a function that will read the data of the file
- * @params: struct libfsverity_merkle_tree_params specifying hash algorithm,
- *	    block size, version, and optional salt parameters.
- *	    reserved parameters must be zero.
+ * @params: struct libfsverity_merkle_tree_params specifying the fs-verity
+ *	    version, the hash algorithm, the file size, the block size, and
+ *	    optionally a salt.  Reserved fields must be zero.
  * @digest_ret: Pointer to pointer for computed digest.
  *
  * Returns:
- * * 0 for success, -EINVAL for invalid input arguments, -ENOMEM if failed
- *   to allocate memory, or an error returned by @read_fn.
+ * * 0 for success, -EINVAL for invalid input arguments, -ENOMEM if libfsverity
+ *   failed to allocate memory, or an error returned by @read_fn.
  * * digest_ret returns a pointer to the digest on success. The digest object
- *   is allocated by libfsverity and must be freed by the caller.
+ *   is allocated by libfsverity and must be freed by the caller using free().
  */
 int
 libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
@@ -91,7 +91,7 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
  *          source tree for further details.
  * @digest: pointer to previously computed digest
  * @sig_params: struct libfsverity_signature_params providing filenames of
- *          the keyfile and certificate file. Reserved parameters must be zero.
+ *          the keyfile and certificate file. Reserved fields must be zero.
  * @sig_ret: Pointer to pointer for signed digest
  * @sig_size_ret: Pointer to size of signed return digest
  *
@@ -100,7 +100,7 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
  *   operations to sign the digest failed, -EBADMSG if the key and/or
  *   certificate file is invalid, or another negative errno value.
  * * sig_ret returns a pointer to the signed digest on success. This object
- *   is allocated by libfsverity and must be freed by the caller.
+ *   is allocated by libfsverity and must be freed by the caller using free().
  * * sig_size_ret returns the size (in bytes) of the signed digest on success.
  */
 int
@@ -134,7 +134,10 @@ const char *libfsverity_get_hash_name(uint32_t alg_num);
 
 /**
  * libfsverity_set_error_callback() - Set callback to handle error messages
- * @cb: the callback function
+ * @cb: the callback function.
+ *
+ * If a callback is already set, it is replaced.  @cb may be NULL in order to
+ * remove the existing callback.
  */
 void libfsverity_set_error_callback(void (*cb)(const char *msg));
 
