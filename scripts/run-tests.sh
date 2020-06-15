@@ -74,7 +74,7 @@ log "Build and test with gcc (-Wall + -Werror)"
 $MAKE CC=gcc CFLAGS="-Wall -Werror" check
 
 log "Build and test with gcc (32-bit)"
-$MAKE CC=gcc CFLAGS="-m32" LDFLAGS="-m32" check
+$MAKE CC=gcc CFLAGS="-m32" check
 
 log "Build and test with clang"
 $MAKE CC=clang check
@@ -84,15 +84,14 @@ $MAKE CC=clang CFLAGS="-Wall -Werror" check
 
 log "Build and test with clang + UBSAN"
 $MAKE CC=clang CFLAGS="-fsanitize=undefined -fno-sanitize-recover=undefined" \
-	LDFLAGS="-fsanitize=undefined" check
+	check
 
 log "Build and test with clang + ASAN"
-$MAKE CC=clang CFLAGS="-fsanitize=address -fno-sanitize-recover=address" \
-	LDFLAGS="-fsanitize=address" check
+$MAKE CC=clang CFLAGS="-fsanitize=address -fno-sanitize-recover=address" check
 
 log "Build and test with clang + unsigned integer overflow sanitizer"
 $MAKE CC=clang CFLAGS="-fsanitize=unsigned-integer-overflow -fno-sanitize-recover=unsigned-integer-overflow" \
-	LDFLAGS="-fsanitize=unsigned-integer-overflow" check
+	check
 
 log "Build and test with valgrind"
 $MAKE TEST_WRAPPER_PROG="valgrind --quiet --error-exitcode=100 --leak-check=full --errors-for-leak-kinds=all" \

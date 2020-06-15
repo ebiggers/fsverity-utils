@@ -93,7 +93,8 @@ DEFAULT_TARGETS += libfsverity.a
 
 # Create shared library
 libfsverity.so.$(SOVERSION):$(SHARED_LIB_OBJ)
-	$(QUIET_CCLD) $(CC) -o $@ -Wl,-soname=$@ -shared $+ $(LDFLAGS) $(LDLIBS)
+	$(QUIET_CCLD) $(CC) -o $@ -Wl,-soname=$@ -shared $+ \
+		$(CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 DEFAULT_TARGETS += libfsverity.so.$(SOVERSION)
 
@@ -127,17 +128,18 @@ $(ALL_PROG_OBJ): %.o: %.c $(ALL_PROG_HEADERS) .build-config
 # Link the fsverity program
 ifdef USE_SHARED_LIB
 fsverity: $(FSVERITY_PROG_OBJ) libfsverity.so
-	$(QUIET_CCLD) $(CC) -o $@ $(FSVERITY_PROG_OBJ) -L. -lfsverity
+	$(QUIET_CCLD) $(CC) -o $@ $(FSVERITY_PROG_OBJ) \
+		$(CFLAGS) $(LDFLAGS) -L. -lfsverity
 else
 fsverity: $(FSVERITY_PROG_OBJ) libfsverity.a
-	$(QUIET_CCLD) $(CC) -o $@ $+ $(LDFLAGS) $(LDLIBS)
+	$(QUIET_CCLD) $(CC) -o $@ $+ $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 endif
 
 DEFAULT_TARGETS += fsverity
 
 # Link the test programs
 $(TEST_PROGRAMS): %: programs/%.o $(PROG_COMMON_OBJ) libfsverity.a
-	$(QUIET_CCLD) $(CC) -o $@ $+ $(LDFLAGS) $(LDLIBS)
+	$(QUIET_CCLD) $(CC) -o $@ $+ $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 ##############################################################################
 
