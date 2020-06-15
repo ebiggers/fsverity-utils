@@ -17,6 +17,7 @@ PKG=fsverity-utils-$VERS
 git checkout -f
 git clean -fdx
 ./scripts/run-tests.sh
+git clean -fdx
 
 major=$(echo "$VERS" | cut -d. -f1)
 minor=$(echo "$VERS" | cut -d. -f2)
@@ -27,7 +28,6 @@ git commit -a --signoff --message="v$VERS"
 git tag --sign "v$VERS" --message="$PKG"
 
 git archive "v$VERS" --prefix="$PKG/" > "$PKG.tar"
-rm -rf "$PKG"
 tar xf "$PKG.tar"
 ( cd "$PKG" && make check )
 rm -r "$PKG"
@@ -36,3 +36,5 @@ gpg --detach-sign --armor "$PKG.tar"
 DESTDIR=/pub/linux/kernel/people/ebiggers/fsverity-utils/v$VERS
 kup mkdir "$DESTDIR"
 kup put "$PKG.tar" "$PKG.tar.asc" "$DESTDIR/$PKG.tar.gz"
+git push
+git push --tags
