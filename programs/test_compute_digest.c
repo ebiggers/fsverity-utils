@@ -4,6 +4,7 @@
  *
  * Copyright 2020 Google LLC
  */
+
 #include "utils.h"
 
 #define SHA256_DIGEST_SIZE 32
@@ -42,6 +43,8 @@ int main(void)
 		"\xe4\xaf\x7b\x5a\xbe\x33\xbd\xbc\x56\x8d\x5d\x8f\x1e\x5c\x4d"
 		"\x86\x52";
 	int err;
+
+	install_libfsverity_error_handler();
 
 	f.data = xmalloc(f.size);
 	for (i = 0; i < f.size; i++)

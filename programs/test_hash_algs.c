@@ -4,6 +4,7 @@
  *
  * Copyright 2020 Google LLC
  */
+
 #include "utils.h"
 
 #define SHA256_DIGEST_SIZE 32
@@ -11,6 +12,8 @@
 
 int main(void)
 {
+	install_libfsverity_error_handler();
+
 	ASSERT(libfsverity_get_digest_size(0) == -1);
 	ASSERT(libfsverity_get_hash_name(0) == NULL);
 	ASSERT(libfsverity_find_hash_alg_by_name("bad") == 0);

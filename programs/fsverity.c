@@ -200,16 +200,11 @@ u32 get_default_block_size(void)
 	return n;
 }
 
-static void print_libfsverity_error(const char *msg)
-{
-	error_msg("%s", msg);
-}
-
 int main(int argc, char *argv[])
 {
 	const struct fsverity_command *cmd;
 
-	libfsverity_set_error_callback(print_libfsverity_error);
+	install_libfsverity_error_handler();
 
 	if (argc < 2) {
 		error_msg("no command specified");

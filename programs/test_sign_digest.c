@@ -4,6 +4,7 @@
  *
  * Copyright 2020 Google LLC
  */
+
 #include "utils.h"
 
 #include <fcntl.h>
@@ -23,6 +24,8 @@ int main(void)
 	u8 *expected_sig;
 	u64 expected_sig_size;
 	int err;
+
+	install_libfsverity_error_handler();
 
 	d->digest_algorithm = FS_VERITY_HASH_ALG_SHA256;
 	d->digest_size = SHA256_DIGEST_SIZE;

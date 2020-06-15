@@ -84,6 +84,16 @@ __noreturn void assertion_failed(const char *expr, const char *file, int line)
 	fatal_error("Assertion failed: %s at %s:%d", expr, file, line);
 }
 
+static void print_libfsverity_error(const char *msg)
+{
+	error_msg("%s", msg);
+}
+
+void install_libfsverity_error_handler(void)
+{
+	libfsverity_set_error_callback(print_libfsverity_error);
+}
+
 /* ========== File utilities ========== */
 
 bool open_file(struct filedes *file, const char *filename, int flags, int mode)

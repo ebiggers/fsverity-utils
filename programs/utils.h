@@ -27,6 +27,8 @@ __cold __noreturn void assertion_failed(const char *expr,
 
 #define ASSERT(e) ({ if (!(e)) assertion_failed(#e, __FILE__, __LINE__); })
 
+void install_libfsverity_error_handler(void);
+
 struct filedes {
 	int fd;
 	char *name;		/* filename, for logging or error messages */
