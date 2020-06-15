@@ -43,6 +43,12 @@ typedef uint64_t u64;
 	_a < _b ? _a : _b;		\
 })
 
+#define max(a, b) ({			\
+	__typeof__(a) _a = (a);		\
+	__typeof__(b) _b = (b);		\
+	_a > _b ? _a : _b;		\
+})
+
 #define roundup(x, y) ({		\
 	__typeof__(y) _y = (y);		\
 	(((x) + _y - 1) / _y) * _y;	\
