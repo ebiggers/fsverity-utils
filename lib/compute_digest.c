@@ -185,7 +185,7 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
 				      params->salt_size);
 		return -EINVAL;
 	}
-	if (params->salt_size && !params->salt)  {
+	if (params->salt_size && !params->salt) {
 		libfsverity_error_msg("salt_size specified, but salt is NULL");
 		return -EINVAL;
 	}
@@ -201,6 +201,12 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
 	if (!hash_alg) {
 		libfsverity_error_msg("unknown hash algorithm: %u",
 				      params->hash_algorithm);
+		return -EINVAL;
+	}
+
+	if (params->block_size < 2 * hash_alg->digest_size) {
+		libfsverity_error_msg("block size (%u) too small for hash algorithm %s",
+				      params->block_size, hash_alg->name);
 		return -EINVAL;
 	}
 
