@@ -1,21 +1,31 @@
-# Introduction
+# fsverity-utils
+
+## Introduction
 
 This is `fsverity`, a userspace utility for fs-verity.  fs-verity is a
 Linux kernel feature that does transparent on-demand
 integrity/authenticity verification of the contents of read-only
 files, using a hidden Merkle tree (hash tree) associated with the
-file.  The mechanism is similar to dm-verity, but implemented at the
-file level rather than at the block device level.  The `fsverity`
-utility allows you to set up fs-verity protected files.
+file.  It is similar to dm-verity, but implemented at the file level
+rather than at the block device level.  See the [kernel
+documentation](https://www.kernel.org/doc/html/latest/filesystems/fsverity.html)
+for more information about fs-verity.
 
-fs-verity will initially be supported by the ext4 and f2fs
-filesystems, but it may later be supported by other filesystems too.
+fs-verity is supported by the ext4 and f2fs filesystems in Linux v5.4
+and later when configured with `CONFIG_FS_VERITY=y` and when the
+`verity` filesystem feature flag has been enabled.  Other filesystems
+might add support for fs-verity in the future.
 
-# Building and installing
+The `fsverity` program allows you to set up fs-verity protected files.
+In addition, the file measurement computation and signing
+functionality of `fsverity` is optionally exposed through a C library
+`libfsverity`.  See `libfsverity.h` for the API of this library.
 
-The `fsverity` utility uses the OpenSSL library, so you first must
-install the needed development files.  For example, on Debian-based
-systems, run:
+## Building and installing
+
+`fsverity` and `libfsverity` use the OpenSSL library, so you first
+must install the needed development files.  For example, on
+Debian-based systems, run:
 
 ```bash
     sudo apt-get install libssl-dev
@@ -23,16 +33,26 @@ systems, run:
 
 OpenSSL must be version 1.0.0 or later.
 
-Then, to build and install:
+Then, to build and install fsverity-utils:
 
 ```bash
     make
     sudo make install
 ```
 
-# Examples
+By default, the following targets are built and installed: the program
+`fsverity`, the static library `libfsverity.a`, and the shared library
+`libfsverity.so`.  You can also run `make check` to build and run the
+tests, or `make help` to display all available build targets.
 
-## Basic use
+By default, `fsverity` is statically linked to `libfsverity`.  You can
+use `make USE_SHARED_LIB=1` to use dynamic linking instead.
+
+See the `Makefile` for other supported build and installation options.
+
+## Examples
+
+### Basic use
 
 ```bash
     mkfs.ext4 -O verity /dev/vdc
@@ -41,7 +61,7 @@ Then, to build and install:
 
     # Create a test file
     head -c 1000000 /dev/urandom > file
-    md5sum file
+    sha256sum file
 
     # Enable verity on the file
     fsverity enable file
@@ -53,7 +73,7 @@ Then, to build and install:
     # is now transparently checked against a hidden Merkle tree, whose
     # root hash is incorporated into the verity file measurement.
     # Reads of any corrupted parts of the data will fail.
-    md5sum file
+    sha256sum file
 ```
 
 Note that in the above example, the file isn't signed.  Therefore, to
@@ -61,7 +81,7 @@ get any authenticity protection (as opposed to just integrity
 protection), the output of `fsverity measure` needs to be compared
 against a trusted value.
 
-## Using builtin signatures
+### Using builtin signatures
 
 With `CONFIG_FS_VERITY_BUILTIN_SIGNATURES=y`, the filesystem supports
 automatically verifying a signed file measurement that has been
@@ -87,11 +107,11 @@ the set of X.509 certificates that have been loaded into the
     sysctl fs.verity.require_signatures=1
 
     # Now set up fs-verity on a test file:
-    md5sum file
+    sha256sum file
     fsverity sign file file.sig --key=key.pem --cert=cert.pem
     fsverity enable file --signature=file.sig
     rm -f file.sig
-    md5sum file
+    sha256sum file
 ```
 
 By default, it's not required that verity files have a signature.
@@ -103,11 +123,11 @@ Note: applications generally still need to check whether the file
 they're accessing really is a verity file, since an attacker could
 replace a verity file with a regular one.
 
-## With IMA
+### With IMA
 
 IMA support for fs-verity is planned.
 
-# Notices
+## Notices
 
 This project is provided under the terms of the GNU General Public
 License, version 2; or at your option, any later version.  A copy of the
@@ -117,11 +137,13 @@ Permission to link to OpenSSL (libcrypto) is granted.
 
 Send questions and bug reports to linux-fscrypt@vger.kernel.org.
 
-# Submitting patches
+## Contributing
 
 Send patches to linux-fscrypt@vger.kernel.org.  Patches should follow
-the Linux kernel's coding style.  Additionally, like the Linux kernel
-itself, patches require the following "sign-off" procedure:
+the Linux kernel's coding style.  A `.clang-format` file is provided
+to approximate this coding style; consider using `git clang-format`.
+Additionally, like the Linux kernel itself, patches require the
+following "sign-off" procedure:
 
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right
