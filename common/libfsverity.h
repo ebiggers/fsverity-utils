@@ -26,9 +26,9 @@ extern "C" {
 struct libfsverity_merkle_tree_params {
 	uint32_t version;		/* must be 1			*/
 	uint32_t hash_algorithm;	/* one of FS_VERITY_HASH_ALG_*	*/
+	uint64_t file_size;		/* file size in bytes		*/
 	uint32_t block_size;		/* Merkle tree block size in bytes */
 	uint32_t salt_size;		/* salt size in bytes (0 if unsalted) */
-	uint64_t file_size;		/* file size in bytes		*/
 	const uint8_t *salt;		/* pointer to salt (optional)	*/
 	uint64_t reserved1[8];		/* must be 0 */
 	uintptr_t reserved2[8];		/* must be 0 */
