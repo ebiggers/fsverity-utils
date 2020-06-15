@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2020 Google LLC
+#
+# Formatting settings to approximate the Linux kernel coding style.
+BasedOnStyle: LLVM
+AllowShortFunctionsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+BreakBeforeBraces: Linux
+Cpp11BracedListStyle: false
+IncludeBlocks: Preserve
+IndentCaseLabels: false
+IndentWidth: 8
+UseTab: Always
