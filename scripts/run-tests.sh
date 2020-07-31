@@ -1,6 +1,11 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: MIT
 # Copyright 2020 Google LLC
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT.
+#
 #
 # Test script for fsverity-utils.  Runs 'make check' in lots of configurations,
 # runs static analysis, and does a few other tests.
@@ -92,12 +97,18 @@ log "Check that all files have license and copyright info"
 list="$TMPDIR/filelist"
 filter_license_info() {
 	# files to exclude from license and copyright info checks
-	grep -E -v '(\.gitignore|COPYING|NEWS|README|testdata|fsverity_uapi\.h)'
+	grep -E -v '(\.gitignore|LICENSE|NEWS|README|testdata|fsverity_uapi\.h)'
 }
-git grep -L 'SPDX-License-Identifier: GPL-2\.0-or-later' \
+git grep -L 'SPDX-License-Identifier: MIT' \
 	| filter_license_info > "$list" || true
 if [ -s "$list" ]; then
 	fail "The following files are missing an appropriate SPDX license identifier: $(<"$list")"
+fi
+# For now some people still prefer a free-form license statement, not just SPDX.
+git grep -L 'Use of this source code is governed by an MIT-style' \
+	| filter_license_info > "$list" || true
+if [ -s "$list" ]; then
+	fail "The following files are missing an appropriate license statement: $(<"$list")"
 fi
 git grep -L '\<Copyright\>' | filter_license_info > "$list" || true
 if [ -s "$list" ]; then

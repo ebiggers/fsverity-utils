@@ -1,5 +1,9 @@
 # fsverity-utils release notes
 
+## Version 1.2
+
+* Changed license from GPL to MIT.
+
 ## Version 1.1
 
 * Split the file measurement computation and signing functionality

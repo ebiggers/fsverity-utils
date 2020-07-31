@@ -1,8 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 /*
  * fs-verity userspace tool
  *
  * Copyright 2018 Google LLC
+ *
+ * Use of this source code is governed by an MIT-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/MIT.
  */
 
 #include "fsverity.h"
@@ -84,16 +88,8 @@ void usage(const struct fsverity_command *cmd, FILE *fp)
 
 static void show_version(void)
 {
-	printf(
-"fsverity v%d.%d\n"
-"Copyright 2018 Google LLC\n"
-"License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl.html>.\n"
-"This is free software: you are free to change and redistribute it.\n"
-"There is NO WARRANTY, to the extent permitted by law.\n"
-"\n"
-"Report bugs to linux-fscrypt@vger.kernel.org.\n",
-		FSVERITY_UTILS_MAJOR_VERSION,
-		FSVERITY_UTILS_MINOR_VERSION);
+	printf("fsverity v%d.%d\n", FSVERITY_UTILS_MAJOR_VERSION,
+	       FSVERITY_UTILS_MINOR_VERSION);
 }
 
 static void handle_common_options(int argc, char *argv[],

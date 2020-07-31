@@ -1,9 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 /*
  * Implementation of libfsverity_compute_digest().
  *
  * Copyright 2018 Google LLC
  * Copyright (C) 2020 Facebook
+ *
+ * Use of this source code is governed by an MIT-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/MIT.
  */
 
 #include "lib_private.h"

@@ -129,11 +129,8 @@ IMA support for fs-verity is planned.
 
 ## Notices
 
-This project is provided under the terms of the GNU General Public
-License, version 2; or at your option, any later version.  A copy of the
-GPLv2 can be found in the file named [COPYING](COPYING).
-
-Permission to link to OpenSSL (libcrypto) is granted.
+This project is provided under the terms of the MIT license.  A copy
+of this license can be found in the file named [LICENSE](LICENSE).
 
 Send questions and bug reports to linux-fscrypt@vger.kernel.org.
 
