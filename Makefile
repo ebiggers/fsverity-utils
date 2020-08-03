@@ -32,7 +32,7 @@
 #
 ##############################################################################
 
-cc-option = $(shell if $(CC) $(1) -c -x c /dev/null -o /dev/null &>/dev/null; \
+cc-option = $(shell if $(CC) $(1) -c -x c /dev/null -o /dev/null > /dev/null 2>&1; \
 	      then echo $(1); fi)
 
 CFLAGS ?= -O2 -Wall -Wundef					\
