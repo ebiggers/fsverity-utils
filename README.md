@@ -136,11 +136,12 @@ Send questions and bug reports to linux-fscrypt@vger.kernel.org.
 
 ## Contributing
 
-Send patches to linux-fscrypt@vger.kernel.org.  Patches should follow
-the Linux kernel's coding style.  A `.clang-format` file is provided
-to approximate this coding style; consider using `git clang-format`.
-Additionally, like the Linux kernel itself, patches require the
-following "sign-off" procedure:
+Send patches to linux-fscrypt@vger.kernel.org with the additional tag
+'fsverity-utils' in the subject, i.e. [fsverity-utils PATCH].  Patches
+should follow the Linux kernel's coding style.  A `.clang-format` file
+is provided to approximate this coding style; consider using
+ `git clang-format`.  Additionally, like the Linux kernel itself,
+patches require the following "sign-off" procedure:
 
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right
