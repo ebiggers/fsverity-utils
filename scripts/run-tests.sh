@@ -93,6 +93,11 @@ if [ "$(find "$TMPDIR" -type f -o -type l | wc -l)" != 0 ]; then
 fi
 rm -r "${TMPDIR:?}"/*
 
+log "Build, install, and uninstall with dash"
+make clean SHELL=/bin/dash
+make DESTDIR="$TMPDIR" SHELL=/bin/dash install
+make DESTDIR="$TMPDIR" SHELL=/bin/dash uninstall
+
 log "Check that all files have license and copyright info"
 list="$TMPDIR/filelist"
 filter_license_info() {
