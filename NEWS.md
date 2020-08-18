@@ -4,6 +4,8 @@
 
 * Changed license from GPL to MIT.
 
+* Fixed build error when /bin/sh is dash.
+
 ## Version 1.1
 
 * Split the file measurement computation and signing functionality

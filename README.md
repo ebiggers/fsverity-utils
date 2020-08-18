@@ -2,8 +2,8 @@
 
 ## Introduction
 
-This is `fsverity`, a userspace utility for fs-verity.  fs-verity is a
-Linux kernel feature that does transparent on-demand
+This is fsverity-utils, a set of userspace utilities for fs-verity.
+fs-verity is a Linux kernel feature that does transparent on-demand
 integrity/authenticity verification of the contents of read-only
 files, using a hidden Merkle tree (hash tree) associated with the
 file.  It is similar to dm-verity, but implemented at the file level
@@ -16,16 +16,16 @@ and later when configured with `CONFIG_FS_VERITY=y` and when the
 `verity` filesystem feature flag has been enabled.  Other filesystems
 might add support for fs-verity in the future.
 
-The `fsverity` program allows you to set up fs-verity protected files.
+fsverity-utils currently contains just one program, `fsverity`.  The
+`fsverity` program allows you to set up fs-verity protected files.
 In addition, the file measurement computation and signing
 functionality of `fsverity` is optionally exposed through a C library
 `libfsverity`.  See `libfsverity.h` for the API of this library.
 
 ## Building and installing
 
-`fsverity` and `libfsverity` use the OpenSSL library, so you first
-must install the needed development files.  For example, on
-Debian-based systems, run:
+fsverity-utils uses the OpenSSL library, so you first must install the
+needed development files.  For example, on Debian-based systems, run:
 
 ```bash
     sudo apt-get install libssl-dev
@@ -129,19 +129,22 @@ IMA support for fs-verity is planned.
 
 ## Notices
 
-This project is provided under the terms of the MIT license.  A copy
+fsverity-utils is provided under the terms of the MIT license.  A copy
 of this license can be found in the file named [LICENSE](LICENSE).
 
 Send questions and bug reports to linux-fscrypt@vger.kernel.org.
 
+Signed release tarballs for fsverity-utils can be found on
+[kernel.org](https://kernel.org/pub/linux/kernel/people/ebiggers/fsverity-utils/).
+
 ## Contributing
 
 Send patches to linux-fscrypt@vger.kernel.org with the additional tag
-'fsverity-utils' in the subject, i.e. [fsverity-utils PATCH].  Patches
-should follow the Linux kernel's coding style.  A `.clang-format` file
-is provided to approximate this coding style; consider using
- `git clang-format`.  Additionally, like the Linux kernel itself,
-patches require the following "sign-off" procedure:
+`fsverity-utils` in the subject, i.e. `[fsverity-utils PATCH]`.
+Patches should follow the Linux kernel's coding style.  A
+`.clang-format` file is provided to approximate this coding style;
+consider using `git clang-format`.  Additionally, like the Linux
+kernel itself, patches require the following "sign-off" procedure:
 
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right
