@@ -11,7 +11,7 @@
 #ifndef LIB_LIB_PRIVATE_H
 #define LIB_LIB_PRIVATE_H
 
-#include "../common/libfsverity.h"
+#include "libfsverity.h"
 #include "../common/common_defs.h"
 #include "../common/fsverity_uapi.h"
 

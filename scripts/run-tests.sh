@@ -71,7 +71,7 @@ int main()
 	std::cout << libfsverity_get_digest_size(FS_VERITY_HASH_ALG_SHA256) << std::endl;
 }
 EOF
-c++ -Wall -Werror "$TMPDIR/test.cc" -Icommon -L. -lfsverity -o "$TMPDIR/test"
+c++ -Wall -Werror "$TMPDIR/test.cc" -Iinclude -L. -lfsverity -o "$TMPDIR/test"
 [ "$(LD_LIBRARY_PATH=. "$TMPDIR/test")" = "32" ]
 rm "${TMPDIR:?}"/*
 

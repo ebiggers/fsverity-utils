@@ -11,7 +11,7 @@
 #ifndef PROGRAMS_UTILS_H
 #define PROGRAMS_UTILS_H
 
-#include "../common/libfsverity.h"
+#include "libfsverity.h"
 #include "../common/common_defs.h"
 
 #include <stdio.h>

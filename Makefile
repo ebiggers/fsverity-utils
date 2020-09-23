@@ -44,7 +44,7 @@ CFLAGS ?= -O2 -Wall -Wundef					\
 	$(call cc-option,-Wunused-parameter)			\
 	$(call cc-option,-Wvla)
 
-override CPPFLAGS := -D_FILE_OFFSET_BITS=64 $(CPPFLAGS)
+override CPPFLAGS := -Iinclude -D_FILE_OFFSET_BITS=64 $(CPPFLAGS)
 
 ifneq ($(V),1)
 QUIET_CC        = @echo '  CC      ' $@;
@@ -182,7 +182,7 @@ install:all
 	install -m644 libfsverity.a $(DESTDIR)$(LIBDIR)
 	install -m755 libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)
 	ln -sf libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)/libfsverity.so
-	install -m644 common/libfsverity.h $(DESTDIR)$(INCDIR)
+	install -m644 include/libfsverity.h $(DESTDIR)$(INCDIR)
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/fsverity
