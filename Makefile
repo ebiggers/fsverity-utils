@@ -71,6 +71,14 @@ DEFAULT_TARGETS :=
 COMMON_HEADERS  := $(wildcard common/*.h)
 LDLIBS          := -lcrypto
 
+# If we are dynamically linking, when running tests we need to override
+# LD_LIBRARY_PATH as no RPATH is set
+ifdef USE_SHARED_LIB
+RUN_FSVERITY    = LD_LIBRARY_PATH=./ ./fsverity
+else
+RUN_FSVERITY    = ./fsverity
+endif
+
 ##############################################################################
 
 #### Library
@@ -166,12 +174,12 @@ check:fsverity test_programs
 	for prog in $(TEST_PROGRAMS); do \
 		$(TEST_WRAPPER_PROG) ./$$prog || exit 1; \
 	done
-	./fsverity --help > /dev/null
-	./fsverity --version > /dev/null
-	./fsverity sign fsverity fsverity.sig \
+	$(RUN_FSVERITY) --help > /dev/null
+	$(RUN_FSVERITY) --version > /dev/null
+	$(RUN_FSVERITY) sign fsverity fsverity.sig \
 		--key=testdata/key.pem --cert=testdata/cert.pem > /dev/null
-	./fsverity sign fsverity fsverity.sig --hash=sha512 --block-size=512 \
-		--salt=12345678 \
+	$(RUN_FSVERITY) sign fsverity fsverity.sig --hash=sha512 \
+		--block-size=512 --salt=12345678 \
 		--key=testdata/key.pem --cert=testdata/cert.pem > /dev/null
 	rm -f fsverity.sig
 	@echo "All tests passed!"
