@@ -51,11 +51,10 @@ if nm libfsverity.a | grep ' T ' | grep -v " libfsverity_"; then
 fi
 
 log "Build and test with dynamic linking"
-$MAKE USE_SHARED_LIB=1
+$MAKE USE_SHARED_LIB=1 check
 if ! ldd fsverity | grep libfsverity.so; then
 	fail "fsverity binary should be dynamically linked to libfsverity when USE_SHARED_LIB=1"
 fi
-LD_LIBRARY_PATH="." ./fsverity --version
 
 log "Check that all exported symbols are prefixed with \"libfsverity_\""
 if nm libfsverity.so | grep ' T ' | grep -v " libfsverity_"; then
