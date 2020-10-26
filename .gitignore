@@ -6,6 +6,7 @@
 /.build-config
 /fsverity
 /fsverity.sig
+/libfsverity.pc
 /run-tests.log
 /test_*
 cscope.*

@@ -51,6 +51,7 @@ QUIET_CC        = @echo '  CC      ' $@;
 QUIET_CCLD      = @echo '  CCLD    ' $@;
 QUIET_AR        = @echo '  AR      ' $@;
 QUIET_LN        = @echo '  LN      ' $@;
+QUIET_GEN       = @echo '  GEN     ' $@;
 endif
 USE_SHARED_LIB  ?=
 PREFIX          ?= /usr/local
@@ -62,7 +63,7 @@ PKGCONF         ?= pkg-config
 
 # Rebuild if a user-specified setting that affects the build changed.
 .build-config: FORCE
-	@flags='$(CC):$(CFLAGS):$(CPPFLAGS):$(LDFLAGS):$(USE_SHARED_LIB)'; \
+	@flags='$(CC):$(CFLAGS):$(CPPFLAGS):$(LDFLAGS):$(USE_SHARED_LIB):$(PREFIX):$(LIBDIR):$(INCDIR):$(BINDIR)'; \
 	if [ "$$flags" != "`cat $@ 2>/dev/null`" ]; then		\
 		[ -e $@ ] && echo "Rebuilding due to new settings";	\
 		echo "$$flags" > $@;					\
@@ -118,6 +119,15 @@ libfsverity.so:libfsverity.so.$(SOVERSION)
 	$(QUIET_LN) ln -sf $+ $@
 
 DEFAULT_TARGETS += libfsverity.so
+
+# Create the pkg-config file
+libfsverity.pc: lib/libfsverity.pc.in .build-config
+	$(QUIET_GEN) sed -e "s|@PREFIX@|$(PREFIX)|" \
+		-e "s|@LIBDIR@|$(LIBDIR)|" \
+		-e "s|@INCDIR@|$(INCDIR)|" \
+		$< > $@
+
+DEFAULT_TARGETS += libfsverity.pc
 
 ##############################################################################
 
@@ -187,11 +197,12 @@ check:fsverity test_programs
 	@echo "All tests passed!"
 
 install:all
-	install -d $(DESTDIR)$(LIBDIR) $(DESTDIR)$(INCDIR) $(DESTDIR)$(BINDIR)
+	install -d $(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(INCDIR) $(DESTDIR)$(BINDIR)
 	install -m755 fsverity $(DESTDIR)$(BINDIR)
 	install -m644 libfsverity.a $(DESTDIR)$(LIBDIR)
 	install -m755 libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)
 	ln -sf libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)/libfsverity.so
+	install -m644 libfsverity.pc $(DESTDIR)$(LIBDIR)/pkgconfig
 	install -m644 include/libfsverity.h $(DESTDIR)$(INCDIR)
 
 uninstall:
@@ -199,6 +210,7 @@ uninstall:
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.a
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.so.$(SOVERSION)
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.so
+	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 	rm -f $(DESTDIR)$(INCDIR)/libfsverity.h
 
 help:

@@ -28,6 +28,8 @@ minor=$(echo "$VERS" | cut -d. -f2)
 sed -E -i -e "/FSVERITY_UTILS_MAJOR_VERSION/s/[0-9]+/$major/" \
 	  -e "/FSVERITY_UTILS_MINOR_VERSION/s/[0-9]+/$minor/" \
 	  include/libfsverity.h
+sed -E -i "/Version:/s/[0-9]+\.[0-9]+/$VERS/" \
+	  lib/libfsverity.pc.in
 git commit -a --signoff --message="v$VERS"
 git tag --sign "v$VERS" --message="$PKG"
 
