@@ -28,7 +28,7 @@
 # Define DESTDIR to override the installation destination directory
 # (default: empty string)
 #
-# You can also specify custom CC, CFLAGS, CPPFLAGS, and/or LDFLAGS.
+# You can also specify custom CC, CFLAGS, CPPFLAGS, LDFLAGS, and/or PKGCONF.
 #
 ##############################################################################
 
@@ -58,6 +58,7 @@ BINDIR          ?= $(PREFIX)/bin
 INCDIR          ?= $(PREFIX)/include
 LIBDIR          ?= $(PREFIX)/lib
 DESTDIR         ?=
+PKGCONF         ?= pkg-config
 
 # Rebuild if a user-specified setting that affects the build changed.
 .build-config: FORCE
@@ -69,7 +70,8 @@ DESTDIR         ?=
 
 DEFAULT_TARGETS :=
 COMMON_HEADERS  := $(wildcard common/*.h)
-LDLIBS          := -lcrypto
+LDLIBS          := $(shell "$(PKGCONF)" libcrypto --libs 2>/dev/null || echo -lcrypto)
+CFLAGS          += $(shell "$(PKGCONF)" libcrypto --cflags 2>/dev/null || echo)
 
 # If we are dynamically linking, when running tests we need to override
 # LD_LIBRARY_PATH as no RPATH is set
