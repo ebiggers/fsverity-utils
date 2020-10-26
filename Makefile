@@ -68,6 +68,7 @@ PKGCONF         ?= pkg-config
 		echo 'CFLAGS=$(CFLAGS)';				\
 		echo 'CPPFLAGS=$(CPPFLAGS)';				\
 		echo 'LDFLAGS=$(LDFLAGS)';				\
+		echo 'LDLIBS=$(LDLIBS)';				\
 		echo 'USE_SHARED_LIB=$(USE_SHARED_LIB)';		\
 		echo 'PREFIX=$(PREFIX)';				\
 		echo 'LIBDIR=$(LIBDIR)';				\
