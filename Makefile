@@ -63,7 +63,17 @@ PKGCONF         ?= pkg-config
 
 # Rebuild if a user-specified setting that affects the build changed.
 .build-config: FORCE
-	@flags='$(CC):$(CFLAGS):$(CPPFLAGS):$(LDFLAGS):$(USE_SHARED_LIB):$(PREFIX):$(LIBDIR):$(INCDIR):$(BINDIR)'; \
+	@flags=$$(							\
+		echo 'CC=$(CC)';					\
+		echo 'CFLAGS=$(CFLAGS)';				\
+		echo 'CPPFLAGS=$(CPPFLAGS)';				\
+		echo 'LDFLAGS=$(LDFLAGS)';				\
+		echo 'USE_SHARED_LIB=$(USE_SHARED_LIB)';		\
+		echo 'PREFIX=$(PREFIX)';				\
+		echo 'LIBDIR=$(LIBDIR)';				\
+		echo 'INCDIR=$(INCDIR)';				\
+		echo 'BINDIR=$(BINDIR)';				\
+	);								\
 	if [ "$$flags" != "`cat $@ 2>/dev/null`" ]; then		\
 		[ -e $@ ] && echo "Rebuilding due to new settings";	\
 		echo "$$flags" > $@;					\
