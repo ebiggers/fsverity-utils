@@ -70,10 +70,6 @@ PKGCONF         ?= pkg-config
 		echo 'LDFLAGS=$(LDFLAGS)';				\
 		echo 'LDLIBS=$(LDLIBS)';				\
 		echo 'USE_SHARED_LIB=$(USE_SHARED_LIB)';		\
-		echo 'PREFIX=$(PREFIX)';				\
-		echo 'LIBDIR=$(LIBDIR)';				\
-		echo 'INCDIR=$(INCDIR)';				\
-		echo 'BINDIR=$(BINDIR)';				\
 	);								\
 	if [ "$$flags" != "`cat $@ 2>/dev/null`" ]; then		\
 		[ -e $@ ] && echo "Rebuilding due to new settings";	\
@@ -130,15 +126,6 @@ libfsverity.so:libfsverity.so.$(SOVERSION)
 	$(QUIET_LN) ln -sf $+ $@
 
 DEFAULT_TARGETS += libfsverity.so
-
-# Create the pkg-config file
-libfsverity.pc: lib/libfsverity.pc.in .build-config
-	$(QUIET_GEN) sed -e "s|@PREFIX@|$(PREFIX)|" \
-		-e "s|@LIBDIR@|$(LIBDIR)|" \
-		-e "s|@INCDIR@|$(INCDIR)|" \
-		$< > $@
-
-DEFAULT_TARGETS += libfsverity.pc
 
 ##############################################################################
 
@@ -216,8 +203,12 @@ install:all
 	install -m644 libfsverity.a $(DESTDIR)$(LIBDIR)
 	install -m755 libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)
 	ln -sf libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)/libfsverity.so
-	install -m644 libfsverity.pc $(DESTDIR)$(LIBDIR)/pkgconfig
-	install -m644 include/libfsverity.h $(DESTDIR)$(INCDIR)
+	sed -e "s|@PREFIX@|$(PREFIX)|" \
+		-e "s|@LIBDIR@|$(LIBDIR)|" \
+		-e "s|@INCDIR@|$(INCDIR)|" \
+		lib/libfsverity.pc.in \
+		> $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
+	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/fsverity
