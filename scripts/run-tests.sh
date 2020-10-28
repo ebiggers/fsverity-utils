@@ -39,7 +39,7 @@ exec 2> >(tee -ia run-tests.log 1>&2)
 MAKE="make -j$(getconf _NPROCESSORS_ONLN)"
 
 log "Build and test with statically linking"
-$MAKE
+$MAKE CFLAGS="-Werror"
 if ldd fsverity | grep libfsverity.so; then
 	fail "fsverity binary should be statically linked to libfsverity by default"
 fi
@@ -51,7 +51,7 @@ if nm libfsverity.a | grep ' T ' | grep -v " libfsverity_"; then
 fi
 
 log "Build and test with dynamic linking"
-$MAKE USE_SHARED_LIB=1 check
+$MAKE CFLAGS="-Werror" USE_SHARED_LIB=1 check
 if ! ldd fsverity | grep libfsverity.so; then
 	fail "fsverity binary should be dynamically linked to libfsverity when USE_SHARED_LIB=1"
 fi
@@ -75,7 +75,7 @@ c++ -Wall -Werror "$TMPDIR/test.cc" -Iinclude -L. -lfsverity -o "$TMPDIR/test"
 rm "${TMPDIR:?}"/*
 
 log "Check that build doesn't produce untracked files"
-$MAKE all test_programs
+$MAKE CFLAGS="-Werror" all test_programs
 if git status --short | grep -q '^??'; then
 	git status
 	fail "Build produced untracked files (check 'git status').  Missing gitignore entry?"
@@ -120,64 +120,64 @@ if [ -s "$list" ]; then
 fi
 rm "$list"
 
-log "Build and test with gcc"
-$MAKE CC=gcc check
-
-log "Build and test with gcc (-Wall + -Werror)"
-$MAKE CC=gcc CFLAGS="-Wall -Werror" check
+log "Build and test with gcc (-O2)"
+$MAKE CC=gcc CFLAGS="-O2 -Werror" check
 
 log "Build and test with gcc (-O3)"
-$MAKE CC=gcc CFLAGS="-O3 -Wall -Werror" check
+$MAKE CC=gcc CFLAGS="-O3 -Werror" check
 
 log "Build and test with gcc (32-bit)"
-$MAKE CC=gcc CFLAGS="-m32 -O2 -Wall -Werror" check
+$MAKE CC=gcc CFLAGS="-O2 -Werror -m32" check
 
-log "Build and test with clang"
-$MAKE CC=clang check
-
-log "Build and test with clang (-Wall + -Werror)"
-$MAKE CC=clang CFLAGS="-Wall -Werror" check
+log "Build and test with clang (-O2)"
+$MAKE CC=clang CFLAGS="-O2 -Werror" check
 
 log "Build and test with clang (-O3)"
-$MAKE CC=clang CFLAGS="-O3 -Wall -Werror" check
+$MAKE CC=clang CFLAGS="-O3 -Werror" check
 
 log "Build and test with clang + UBSAN"
-$MAKE CC=clang CFLAGS="-fsanitize=undefined -fno-sanitize-recover=undefined" \
+$MAKE CC=clang \
+	CFLAGS="-O2 -Werror -fsanitize=undefined -fno-sanitize-recover=undefined" \
 	check
 
 log "Build and test with clang + ASAN"
-$MAKE CC=clang CFLAGS="-fsanitize=address -fno-sanitize-recover=address" check
+$MAKE CC=clang \
+	CFLAGS="-O2 -Werror -fsanitize=address -fno-sanitize-recover=address" \
+	check
 
 log "Build and test with clang + unsigned integer overflow sanitizer"
-$MAKE CC=clang CFLAGS="-fsanitize=unsigned-integer-overflow -fno-sanitize-recover=unsigned-integer-overflow" \
+$MAKE CC=clang \
+	CFLAGS="-O2 -Werror -fsanitize=unsigned-integer-overflow -fno-sanitize-recover=unsigned-integer-overflow" \
 	check
 
 log "Build and test with clang + CFI"
-$MAKE CC=clang CFLAGS="-fsanitize=cfi -flto -fvisibility=hidden" check
+$MAKE CC=clang CFLAGS="-O2 -Werror -fsanitize=cfi -flto -fvisibility=hidden" \
+	check
 
 log "Build and test with valgrind"
 $MAKE TEST_WRAPPER_PROG="valgrind --quiet --error-exitcode=100 --leak-check=full --errors-for-leak-kinds=all" \
-	check
+	CFLAGS="-O2 -Werror" check
 
 log "Build and test using BoringSSL instead of OpenSSL"
 BSSL=$HOME/src/boringssl
-$MAKE LDFLAGS="-L$BSSL/build/crypto" CPPFLAGS="-I$BSSL/include" \
-	LDLIBS="-lcrypto -lpthread" check
+$MAKE CFLAGS="-O2 -Werror" LDFLAGS="-L$BSSL/build/crypto" \
+	CPPFLAGS="-I$BSSL/include" LDLIBS="-lcrypto -lpthread" check
 
 log "Build and test using -funsigned-char"
-$MAKE CFLAGS="-funsigned-char -Wall -Werror" check
+$MAKE CFLAGS="-O2 -Werror -funsigned-char" check
 
 log "Build and test using -fsigned-char"
-$MAKE CFLAGS="-fsigned-char -Wall -Werror" check
+$MAKE CFLAGS="-O2 -Werror -fsigned-char" check
 
 log "Run sparse"
 ./scripts/run-sparse.sh
 
 log "Run clang static analyzer"
-scan-build --status-bugs make all test_programs
+scan-build --status-bugs make CFLAGS="-O2 -Werror" all test_programs
 
 log "Run gcc static analyzer"
-$MAKE CC=gcc CFLAGS="-fanalyzer -Werror" all test_programs
+# Using -O2 here produces a false positive report in fsverity_cmd_sign().
+$MAKE CC=gcc CFLAGS="-O0 -Werror -fanalyzer" all test_programs
 
 log "Run shellcheck"
 shellcheck scripts/*.sh 1>&2

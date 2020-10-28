@@ -35,14 +35,17 @@
 cc-option = $(shell if $(CC) $(1) -c -x c /dev/null -o /dev/null > /dev/null 2>&1; \
 	      then echo $(1); fi)
 
-CFLAGS ?= -O2 -Wall -Wundef					\
+CFLAGS ?= -O2
+
+override CFLAGS := -Wall -Wundef				\
 	$(call cc-option,-Wdeclaration-after-statement)		\
 	$(call cc-option,-Wimplicit-fallthrough)		\
 	$(call cc-option,-Wmissing-field-initializers)		\
 	$(call cc-option,-Wmissing-prototypes)			\
 	$(call cc-option,-Wstrict-prototypes)			\
 	$(call cc-option,-Wunused-parameter)			\
-	$(call cc-option,-Wvla)
+	$(call cc-option,-Wvla)					\
+	$(CFLAGS)
 
 override CPPFLAGS := -Iinclude -D_FILE_OFFSET_BITS=64 $(CPPFLAGS)
 
