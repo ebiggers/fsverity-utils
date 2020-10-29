@@ -206,6 +206,7 @@ install:all
 	install -m644 libfsverity.a $(DESTDIR)$(LIBDIR)
 	install -m755 libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)
 	ln -sf libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)/libfsverity.so
+	install -m644 include/libfsverity.h $(DESTDIR)$(INCDIR)
 	sed -e "s|@PREFIX@|$(PREFIX)|" \
 		-e "s|@LIBDIR@|$(LIBDIR)|" \
 		-e "s|@INCDIR@|$(INCDIR)|" \
