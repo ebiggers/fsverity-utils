@@ -23,13 +23,6 @@ static const struct option longopts[] = {
 	{NULL, 0, NULL, 0}
 };
 
-struct fsverity_signed_digest {
-	char magic[8];			/* must be "FSVerity" */
-	__le16 digest_algorithm;
-	__le16 digest_size;
-	__u8 digest[];
-};
-
 /*
  * Compute the fs-verity measurement of the given file(s), for offline signing.
  */
@@ -68,10 +61,10 @@ int fsverity_cmd_digest(const struct fsverity_command *cmd,
 		goto out_usage;
 
 	for (int i = 0; i < argc; i++) {
-		struct fsverity_signed_digest *d = NULL;
+		struct fsverity_formatted_digest *d = NULL;
 		struct libfsverity_digest *digest = NULL;
 		char digest_hex[FS_VERITY_MAX_DIGEST_SIZE * 2 +
-				sizeof(struct fsverity_signed_digest) * 2 + 1];
+				sizeof(*d) * 2 + 1];
 
 		if (!open_file(&file, argv[i], O_RDONLY, 0))
 			goto out_err;

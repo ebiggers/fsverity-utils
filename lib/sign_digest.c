@@ -19,19 +19,6 @@
 #include <openssl/pkcs7.h>
 #include <string.h>
 
-/*
- * Format in which verity file measurements are signed.  This is the same as
- * 'struct fsverity_digest', except here some magic bytes are prepended to
- * provide some context about what is being signed in case the same key is used
- * for non-fsverity purposes, and here the fields have fixed endianness.
- */
-struct fsverity_signed_digest {
-	char magic[8];			/* must be "FSVerity" */
-	__le16 digest_algorithm;
-	__le16 digest_size;
-	__u8 digest[];
-};
-
 static int print_openssl_err_cb(const char *str,
 				size_t len __attribute__((unused)),
 				void *u __attribute__((unused)))
@@ -339,7 +326,7 @@ libfsverity_sign_digest(const struct libfsverity_digest *digest,
 	EVP_PKEY *pkey = NULL;
 	X509 *cert = NULL;
 	const EVP_MD *md;
-	struct fsverity_signed_digest *d = NULL;
+	struct fsverity_formatted_digest *d = NULL;
 	int err;
 
 	if (!digest || !sig_params || !sig_ret || !sig_size_ret)  {
