@@ -18,9 +18,9 @@ might add support for fs-verity in the future.
 
 fsverity-utils currently contains just one program, `fsverity`.  The
 `fsverity` program allows you to set up fs-verity protected files.
-In addition, the file measurement computation and signing
-functionality of `fsverity` is optionally exposed through a C library
-`libfsverity`.  See `libfsverity.h` for the API of this library.
+In addition, the file digest computation and signing functionality of
+`fsverity` is optionally exposed through a C library `libfsverity`.
+See `libfsverity.h` for the API of this library.
 
 ## Building and installing
 
@@ -66,13 +66,13 @@ See the `Makefile` for other supported build and installation options.
     # Enable verity on the file
     fsverity enable file
 
-    # Show the verity file measurement
+    # Show the verity file digest
     fsverity measure file
 
     # File should still be readable as usual.  However, all data read
     # is now transparently checked against a hidden Merkle tree, whose
-    # root hash is incorporated into the verity file measurement.
-    # Reads of any corrupted parts of the data will fail.
+    # root hash is incorporated into the verity file digest.  Reads of
+    # any corrupted parts of the data will fail.
     sha256sum file
 ```
 
@@ -84,10 +84,10 @@ against a trusted value.
 ### Using builtin signatures
 
 With `CONFIG_FS_VERITY_BUILTIN_SIGNATURES=y`, the filesystem supports
-automatically verifying a signed file measurement that has been
-included in the verity metadata.  The signature is verified against
-the set of X.509 certificates that have been loaded into the
-".fs-verity" kernel keyring.  Here's an example:
+automatically verifying a signed file digest that has been included in
+the verity metadata.  The signature is verified against the set of
+X.509 certificates that have been loaded into the ".fs-verity" kernel
+keyring.  Here's an example:
 
 ```bash
     # Generate a new certificate and private key:

@@ -23,7 +23,7 @@ static const struct fsverity_command {
 		.name = "digest",
 		.func = fsverity_cmd_digest,
 		.short_desc =
-"Compute the fs-verity measurement of the given file(s), for offline signing",
+"Compute the fs-verity digest of the given file(s), for offline signing",
 		.usage_str =
 "    fsverity digest FILE...\n"
 "               [--hash-alg=HASH_ALG] [--block-size=BLOCK_SIZE] [--salt=SALT]\n"
@@ -40,7 +40,7 @@ static const struct fsverity_command {
 		.name = "measure",
 		.func = fsverity_cmd_measure,
 		.short_desc =
-"Display the measurement of the given verity file(s)",
+"Display the fs-verity digest of the given verity file(s)",
 		.usage_str =
 "    fsverity measure FILE...\n"
 	}, {

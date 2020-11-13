@@ -35,7 +35,7 @@ static const struct option longopts[] = {
 	{NULL, 0, NULL, 0}
 };
 
-/* Sign a file for fs-verity by computing its measurement, then signing it. */
+/* Sign a file for fs-verity by computing its digest, then signing it. */
 int fsverity_cmd_sign(const struct fsverity_command *cmd,
 		      int argc, char *argv[])
 {

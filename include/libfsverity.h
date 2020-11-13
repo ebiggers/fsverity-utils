@@ -91,9 +91,9 @@ typedef int (*libfsverity_read_fn_t)(void *fd, void *buf, size_t count);
 
 /**
  * libfsverity_compute_digest() - Compute digest of a file
- *          An fsverity_digest (also called a "file measurement") is the root of
- *          a file's Merkle tree.  Not to be confused with a traditional file
- *          digest computed over the entire file.
+ *          A fs-verity file digest is the hash of a file's fsverity_descriptor.
+ *          Not to be confused with a traditional file digest computed over the
+ *          entire file, or with the bare fsverity_descriptor::root_hash.
  * @fd: context that will be passed to @read_fn
  * @read_fn: a function that will read the data of the file
  * @params: Pointer to the Merkle tree parameters
@@ -112,12 +112,12 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
 
 /**
  * libfsverity_sign_digest() - Sign previously computed digest of a file
- *          This signature is used by the file system to validate the
- *          signed file measurement against a public key loaded into the
- *          .fs-verity kernel keyring, when CONFIG_FS_VERITY_BUILTIN_SIGNATURES
- *          is enabled. The signature is formatted as PKCS#7 stored in DER
- *          format. See Documentation/filesystems/fsverity.rst in the kernel
- *          source tree for further details.
+ *          This signature is used by the filesystem to validate the signed file
+ *          digest against a public key loaded into the .fs-verity kernel
+ *          keyring, when CONFIG_FS_VERITY_BUILTIN_SIGNATURES is enabled. The
+ *          signature is formatted as PKCS#7 stored in DER format. See
+ *          Documentation/filesystems/fsverity.rst in the kernel source tree for
+ *          further details.
  * @digest: pointer to previously computed digest
  * @sig_params: struct libfsverity_signature_params providing filenames of
  *          the keyfile and certificate file. Reserved fields must be zero.

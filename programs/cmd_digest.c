@@ -24,7 +24,7 @@ static const struct option longopts[] = {
 };
 
 /*
- * Compute the fs-verity measurement of the given file(s), for offline signing.
+ * Compute the fs-verity digest of the given file(s), for offline signing.
  */
 int fsverity_cmd_digest(const struct fsverity_command *cmd,
 		      int argc, char *argv[])

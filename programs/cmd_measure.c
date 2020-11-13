@@ -14,7 +14,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-/* Display the measurement of the given verity file(s). */
+/* Display the fs-verity digest of the given verity file(s). */
 int fsverity_cmd_measure(const struct fsverity_command *cmd,
 			 int argc, char *argv[])
 {

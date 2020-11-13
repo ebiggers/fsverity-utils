@@ -8,9 +8,9 @@
 
 ## Version 1.1
 
-* Split the file measurement computation and signing functionality
-  of the `fsverity` program into a library `libfsverity`.  See
-  `README.md` and `Makefile` for more details.
+* Split the file digest computation and signing functionality of the
+  `fsverity` program into a library `libfsverity`.  See `README.md`
+  and `Makefile` for more details.
 
 * Improved the Makefile.
 
