@@ -86,12 +86,6 @@ int fsverity_cmd_digest(const struct fsverity_command *cmd,
 	if (argc < 1)
 		goto out_usage;
 
-	if (tree_params.hash_algorithm == 0)
-		tree_params.hash_algorithm = FS_VERITY_HASH_ALG_DEFAULT;
-
-	if (tree_params.block_size == 0)
-		tree_params.block_size = 4096;
-
 	for (int i = 0; i < argc; i++) {
 		struct fsverity_signed_digest *d = NULL;
 		struct libfsverity_digest *digest = NULL;
@@ -137,7 +131,7 @@ int fsverity_cmd_digest(const struct fsverity_command *cmd,
 			printf("%s %s\n", digest_hex, argv[i]);
 		else
 			printf("%s:%s %s\n",
-			       libfsverity_get_hash_name(tree_params.hash_algorithm),
+			       libfsverity_get_hash_name(digest->digest_algorithm),
 			       digest_hex, argv[i]);
 
 		filedes_close(&file);

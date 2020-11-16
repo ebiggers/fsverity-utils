@@ -27,15 +27,42 @@ extern "C" {
 #define FS_VERITY_HASH_ALG_SHA256       1
 #define FS_VERITY_HASH_ALG_SHA512       2
 
+/**
+ * struct libfsverity_merkle_tree_params - properties of a file's Merkle tree
+ *
+ * Zero this, then fill in at least @version and @file_size.
+ */
 struct libfsverity_merkle_tree_params {
-	uint32_t version;		/* must be 1			*/
-	uint32_t hash_algorithm;	/* one of FS_VERITY_HASH_ALG_*	*/
-	uint64_t file_size;		/* file size in bytes		*/
-	uint32_t block_size;		/* Merkle tree block size in bytes */
-	uint32_t salt_size;		/* salt size in bytes (0 if unsalted) */
-	const uint8_t *salt;		/* pointer to salt (optional)	*/
-	uint64_t reserved1[8];		/* must be 0 */
-	uintptr_t reserved2[8];		/* must be 0 */
+
+	/** @version: must be 1 */
+	uint32_t version;
+
+	/**
+	 * @hash_algorithm: one of FS_VERITY_HASH_ALG_*, or 0 to use the default
+	 * of FS_VERITY_HASH_ALG_SHA256
+	 */
+	uint32_t hash_algorithm;
+
+	/** @file_size: the file size in bytes */
+	uint64_t file_size;
+
+	/**
+	 * @block_size: the Merkle tree block size in bytes, or 0 to use the
+	 * default of 4096 bytes
+	 */
+	uint32_t block_size;
+
+	/** @salt_size: the salt size in bytes, or 0 if unsalted */
+	uint32_t salt_size;
+
+	/** @salt: pointer to the salt, or NULL if unsalted */
+	const uint8_t *salt;
+
+	/** @reserved1: must be 0 */
+	uint64_t reserved1[8];
+
+	/** @reserved2: must be 0 */
+	uintptr_t reserved2[8];
 };
 
 struct libfsverity_digest {
@@ -69,9 +96,7 @@ typedef int (*libfsverity_read_fn_t)(void *fd, void *buf, size_t count);
  *          digest computed over the entire file.
  * @fd: context that will be passed to @read_fn
  * @read_fn: a function that will read the data of the file
- * @params: struct libfsverity_merkle_tree_params specifying the fs-verity
- *	    version, the hash algorithm, the file size, the block size, and
- *	    optionally a salt.  Reserved fields must be zero.
+ * @params: Pointer to the Merkle tree parameters
  * @digest_ret: Pointer to pointer for computed digest.
  *
  * Returns:

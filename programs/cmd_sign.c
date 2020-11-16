@@ -101,12 +101,6 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 	if (argc != 2)
 		goto out_usage;
 
-	if (tree_params.hash_algorithm == 0)
-		tree_params.hash_algorithm = FS_VERITY_HASH_ALG_DEFAULT;
-
-	if (tree_params.block_size == 0)
-		tree_params.block_size = 4096;
-
 	if (sig_params.keyfile == NULL) {
 		error_msg("Missing --key argument");
 		goto out_usage;
@@ -138,8 +132,7 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 	ASSERT(digest->digest_size <= FS_VERITY_MAX_DIGEST_SIZE);
 	bin2hex(digest->digest, digest->digest_size, digest_hex);
 	printf("Signed file '%s' (%s:%s)\n", argv[0],
-	       libfsverity_get_hash_name(tree_params.hash_algorithm),
-	       digest_hex);
+	       libfsverity_get_hash_name(digest->digest_algorithm), digest_hex);
 	status = 0;
 out:
 	filedes_close(&file);

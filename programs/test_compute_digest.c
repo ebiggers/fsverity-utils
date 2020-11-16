@@ -139,7 +139,13 @@ static const struct test_case {
 			  "\x56\xce\x29\xa9\x60\xbf\x4b\xb0"
 			  "\xe5\x95\xec\x38\x6c\xa5\x8c\x06"
 			  "\x51\x9d\x54\x6d\xc5\xb1\x97\xbb",
-	}
+	}, { /* default hash algorithm (SHA-256) and block size (4096) */
+		.file_size = 100000,
+		.digest = "\xf2\x09\x6a\x36\xc5\xcd\xca\x4f"
+			  "\xa3\x3e\xe8\x85\x28\x33\x15\x0b"
+			  "\xb3\x24\x99\x2e\x54\x17\xa9\xd5"
+			  "\x71\xf1\xbf\xff\xf7\x3b\x9e\xfc",
+	},
 };
 
 static void fix_digest_and_print(const struct test_case *t,
@@ -206,15 +212,11 @@ static void test_invalid_params(void)
 
 	/* bad hash_algorithm */
 	params = good_params;
-	params.hash_algorithm = 0;
-	ASSERT(libfsverity_compute_digest(&f, read_fn, &params, &d) == -EINVAL);
 	params.hash_algorithm = 1000;
 	ASSERT(libfsverity_compute_digest(&f, read_fn, &params, &d) == -EINVAL);
 
 	/* bad block_size */
 	params = good_params;
-	params.block_size = 0;
-	ASSERT(libfsverity_compute_digest(&f, read_fn, &params, &d) == -EINVAL);
 	params.block_size = 1;
 	ASSERT(libfsverity_compute_digest(&f, read_fn, &params, &d) == -EINVAL);
 	params.block_size = 4097;
@@ -266,6 +268,8 @@ int main(int argc, char *argv[])
 		f.data[i] = (i % 11) + (i % 439) + (i % 1103);
 
 	for (i = 0; i < ARRAY_SIZE(test_cases); i++) {
+		u32 expected_alg = test_cases[i].hash_algorithm ?:
+				   FS_VERITY_HASH_ALG_SHA256;
 
 		memset(&params, 0, sizeof(params));
 		params.version = 1;
@@ -283,9 +287,9 @@ int main(int argc, char *argv[])
 		err = libfsverity_compute_digest(&f, read_fn, &params, &d);
 		ASSERT(err == 0);
 
-		ASSERT(d->digest_algorithm == test_cases[i].hash_algorithm);
+		ASSERT(d->digest_algorithm == expected_alg);
 		ASSERT(d->digest_size ==
-		       libfsverity_get_digest_size(test_cases[i].hash_algorithm));
+		       libfsverity_get_digest_size(expected_alg));
 		if (update)
 			fix_digest_and_print(&test_cases[i], d);
 		else

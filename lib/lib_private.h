@@ -19,6 +19,12 @@
 
 #define LIBEXPORT	__attribute__((visibility("default")))
 
+/* The hash algorithm that libfsverity assumes when none is specified */
+#define FS_VERITY_HASH_ALG_DEFAULT	FS_VERITY_HASH_ALG_SHA256
+
+/* The block size that libfsverity assumes when none is specified */
+#define FS_VERITY_BLOCK_SIZE_DEFAULT	4096
+
 /* hash_algs.c */
 
 struct fsverity_hash_alg {
