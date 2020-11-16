@@ -49,13 +49,6 @@ out:
 	return ok;
 }
 
-enum {
-	OPT_HASH_ALG,
-	OPT_BLOCK_SIZE,
-	OPT_SALT,
-	OPT_SIGNATURE,
-};
-
 static const struct option longopts[] = {
 	{"hash-alg",	required_argument, NULL, OPT_HASH_ALG},
 	{"block-size",	required_argument, NULL, OPT_BLOCK_SIZE},
@@ -69,7 +62,6 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 			int argc, char *argv[])
 {
 	struct libfsverity_merkle_tree_params tree_params = { .version = 1 };
-	u8 *salt = NULL;
 	u8 *sig = NULL;
 	u32 sig_size = 0;
 	struct filedes file;
@@ -79,20 +71,10 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 	while ((c = getopt_long(argc, argv, "", longopts, NULL)) != -1) {
 		switch (c) {
 		case OPT_HASH_ALG:
-			if (!parse_hash_alg_option(optarg,
-						   &tree_params.hash_algorithm))
-				goto out_usage;
-			break;
 		case OPT_BLOCK_SIZE:
-			if (!parse_block_size_option(optarg,
-						     &tree_params.block_size))
-				goto out_usage;
-			break;
 		case OPT_SALT:
-			if (!parse_salt_option(optarg, &salt,
-					       &tree_params.salt_size))
+			if (!parse_tree_param(c, optarg, &tree_params))
 				goto out_usage;
-			tree_params.salt = salt;
 			break;
 		case OPT_SIGNATURE:
 			if (sig != NULL) {
@@ -127,7 +109,7 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 
 	status = 0;
 out:
-	free(salt);
+	destroy_tree_params(&tree_params);
 	free(sig);
 	return status;
 

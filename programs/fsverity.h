@@ -20,6 +20,17 @@
  */
 #define FS_VERITY_MAX_DIGEST_SIZE	64
 
+enum {
+	OPT_BLOCK_SIZE,
+	OPT_CERT,
+	OPT_COMPACT,
+	OPT_FOR_BUILTIN_SIG,
+	OPT_HASH_ALG,
+	OPT_KEY,
+	OPT_SALT,
+	OPT_SIGNATURE,
+};
+
 struct fsverity_command;
 
 /* cmd_digest.c */
@@ -40,8 +51,8 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 
 /* fsverity.c */
 void usage(const struct fsverity_command *cmd, FILE *fp);
-bool parse_hash_alg_option(const char *arg, u32 *alg_ptr);
-bool parse_block_size_option(const char *arg, u32 *size_ptr);
-bool parse_salt_option(const char *arg, u8 **salt_ptr, u32 *salt_size_ptr);
+bool parse_tree_param(int opt_char, const char *arg,
+		      struct libfsverity_merkle_tree_params *params);
+void destroy_tree_params(struct libfsverity_merkle_tree_params *params);
 
 #endif /* PROGRAMS_FSVERITY_H */

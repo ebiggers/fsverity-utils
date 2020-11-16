@@ -14,14 +14,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 
-enum {
-	OPT_HASH_ALG,
-	OPT_BLOCK_SIZE,
-	OPT_SALT,
-	OPT_COMPACT,
-	OPT_FOR_BUILTIN_SIG,
-};
-
 static const struct option longopts[] = {
 	{"hash-alg",		required_argument, NULL, OPT_HASH_ALG},
 	{"block-size",		required_argument, NULL, OPT_BLOCK_SIZE},
@@ -44,7 +36,6 @@ struct fsverity_signed_digest {
 int fsverity_cmd_digest(const struct fsverity_command *cmd,
 		      int argc, char *argv[])
 {
-	u8 *salt = NULL;
 	struct filedes file = { .fd = -1 };
 	struct libfsverity_merkle_tree_params tree_params = { .version = 1 };
 	bool compact = false, for_builtin_sig = false;
@@ -54,20 +45,10 @@ int fsverity_cmd_digest(const struct fsverity_command *cmd,
 	while ((c = getopt_long(argc, argv, "", longopts, NULL)) != -1) {
 		switch (c) {
 		case OPT_HASH_ALG:
-			if (!parse_hash_alg_option(optarg,
-						   &tree_params.hash_algorithm))
-				goto out_usage;
-			break;
 		case OPT_BLOCK_SIZE:
-			if (!parse_block_size_option(optarg,
-						     &tree_params.block_size))
-				goto out_usage;
-			break;
 		case OPT_SALT:
-			if (!parse_salt_option(optarg, &salt,
-					       &tree_params.salt_size))
+			if (!parse_tree_param(c, optarg, &tree_params))
 				goto out_usage;
-			tree_params.salt = salt;
 			break;
 		case OPT_COMPACT:
 			compact = true;
@@ -140,7 +121,7 @@ int fsverity_cmd_digest(const struct fsverity_command *cmd,
 	}
 	status = 0;
 out:
-	free(salt);
+	destroy_tree_params(&tree_params);
 	return status;
 
 out_err:

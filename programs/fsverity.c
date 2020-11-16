@@ -133,7 +133,7 @@ static const struct fsverity_command *find_command(const char *name)
 	return NULL;
 }
 
-bool parse_hash_alg_option(const char *arg, u32 *alg_ptr)
+static bool parse_hash_alg_option(const char *arg, u32 *alg_ptr)
 {
 	char *end;
 	unsigned long n = strtoul(arg, &end, 10);
@@ -158,7 +158,7 @@ bool parse_hash_alg_option(const char *arg, u32 *alg_ptr)
 	return false;
 }
 
-bool parse_block_size_option(const char *arg, u32 *size_ptr)
+static bool parse_block_size_option(const char *arg, u32 *size_ptr)
 {
 	char *end;
 	unsigned long n = strtoul(arg, &end, 10);
@@ -176,7 +176,8 @@ bool parse_block_size_option(const char *arg, u32 *size_ptr)
 	return true;
 }
 
-bool parse_salt_option(const char *arg, u8 **salt_ptr, u32 *salt_size_ptr)
+static bool parse_salt_option(const char *arg, u8 **salt_ptr,
+			      u32 *salt_size_ptr)
 {
 	if (*salt_ptr != NULL) {
 		error_msg("--salt can only be specified once");
@@ -189,6 +190,28 @@ bool parse_salt_option(const char *arg, u8 **salt_ptr, u32 *salt_size_ptr)
 		return false;
 	}
 	return true;
+}
+
+bool parse_tree_param(int opt_char, const char *arg,
+		      struct libfsverity_merkle_tree_params *params)
+{
+	switch (opt_char) {
+	case OPT_HASH_ALG:
+		return parse_hash_alg_option(arg, &params->hash_algorithm);
+	case OPT_BLOCK_SIZE:
+		return parse_block_size_option(arg, &params->block_size);
+	case OPT_SALT:
+		return parse_salt_option(arg, (u8 **)&params->salt,
+					 &params->salt_size);
+	default:
+		ASSERT(0);
+	}
+}
+
+void destroy_tree_params(struct libfsverity_merkle_tree_params *params)
+{
+	free((u8 *)params->salt);
+	memset(params, 0, sizeof(*params));
 }
 
 int main(int argc, char *argv[])
