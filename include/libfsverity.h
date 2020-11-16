@@ -138,6 +138,42 @@ libfsverity_sign_digest(const struct libfsverity_digest *digest,
 			uint8_t **sig_ret, size_t *sig_size_ret);
 
 /**
+ * libfsverity_enable() - Enable fs-verity on a file
+ * @fd: read-only file descriptor to the file
+ * @params: pointer to the Merkle tree parameters
+ *
+ * This is a simple wrapper around the FS_IOC_ENABLE_VERITY ioctl.
+ *
+ * Return: 0 on success, -EINVAL for invalid arguments, or a negative errno
+ *	   value from the FS_IOC_ENABLE_VERITY ioctl.  See
+ *	   Documentation/filesystems/fsverity.rst in the kernel source tree for
+ *	   the possible error codes from FS_IOC_ENABLE_VERITY.
+ */
+int
+libfsverity_enable(int fd, const struct libfsverity_merkle_tree_params *params);
+
+/**
+ * libfsverity_enable_with_sig() - Enable fs-verity on a file, with a signature
+ * @fd: read-only file descriptor to the file
+ * @params: pointer to the Merkle tree parameters
+ * @sig: pointer to the file's signature
+ * @sig_size: size of the file's signature in bytes
+ *
+ * Like libfsverity_enable(), but allows specifying a built-in signature (i.e. a
+ * singature created with libfsverity_sign_digest()) to associate with the file.
+ * This is only needed if the in-kernel signature verification support is being
+ * used; it is not needed if signatures are being verified in userspace.
+ *
+ * If @sig is NULL and @sig_size is 0, this is the same as libfsverity_enable().
+ *
+ * Return: See libfsverity_enable().
+ */
+int
+libfsverity_enable_with_sig(int fd,
+			    const struct libfsverity_merkle_tree_params *params,
+			    const uint8_t *sig, size_t sig_size);
+
+/**
  * libfsverity_find_hash_alg_by_name() - Find hash algorithm by name
  * @name: Pointer to name of hash algorithm
  *

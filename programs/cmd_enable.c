@@ -68,9 +68,10 @@ static const struct option longopts[] = {
 int fsverity_cmd_enable(const struct fsverity_command *cmd,
 			int argc, char *argv[])
 {
-	struct fsverity_enable_arg arg = { .version = 1 };
+	struct libfsverity_merkle_tree_params tree_params = { .version = 1 };
 	u8 *salt = NULL;
 	u8 *sig = NULL;
+	u32 sig_size = 0;
 	struct filedes file;
 	int status;
 	int c;
@@ -78,26 +79,28 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 	while ((c = getopt_long(argc, argv, "", longopts, NULL)) != -1) {
 		switch (c) {
 		case OPT_HASH_ALG:
-			if (!parse_hash_alg_option(optarg, &arg.hash_algorithm))
+			if (!parse_hash_alg_option(optarg,
+						   &tree_params.hash_algorithm))
 				goto out_usage;
 			break;
 		case OPT_BLOCK_SIZE:
-			if (!parse_block_size_option(optarg, &arg.block_size))
+			if (!parse_block_size_option(optarg,
+						     &tree_params.block_size))
 				goto out_usage;
 			break;
 		case OPT_SALT:
-			if (!parse_salt_option(optarg, &salt, &arg.salt_size))
+			if (!parse_salt_option(optarg, &salt,
+					       &tree_params.salt_size))
 				goto out_usage;
-			arg.salt_ptr = (uintptr_t)salt;
+			tree_params.salt = salt;
 			break;
 		case OPT_SIGNATURE:
 			if (sig != NULL) {
 				error_msg("--signature can only be specified once");
 				goto out_usage;
 			}
-			if (!read_signature(optarg, &sig, &arg.sig_size))
+			if (!read_signature(optarg, &sig, &sig_size))
 				goto out_err;
-			arg.sig_ptr = (uintptr_t)sig;
 			break;
 		default:
 			goto out_usage;
@@ -110,15 +113,10 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 	if (argc != 1)
 		goto out_usage;
 
-	if (arg.hash_algorithm == 0)
-		arg.hash_algorithm = FS_VERITY_HASH_ALG_DEFAULT;
-
-	if (arg.block_size == 0)
-		arg.block_size = 4096;
-
 	if (!open_file(&file, argv[0], O_RDONLY, 0))
 		goto out_err;
-	if (ioctl(file.fd, FS_IOC_ENABLE_VERITY, &arg) != 0) {
+
+	if (libfsverity_enable_with_sig(file.fd, &tree_params, sig, sig_size)) {
 		error_msg_errno("FS_IOC_ENABLE_VERITY failed on '%s'",
 				file.name);
 		filedes_close(&file);

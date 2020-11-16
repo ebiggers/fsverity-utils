@@ -14,9 +14,6 @@
 #include "utils.h"
 #include "../common/fsverity_uapi.h"
 
-/* The hash algorithm that 'fsverity' assumes when none is specified */
-#define FS_VERITY_HASH_ALG_DEFAULT	FS_VERITY_HASH_ALG_SHA256
-
 /*
  * Largest digest size among all hash algorithms supported by fs-verity.
  * This can be increased if needed.
