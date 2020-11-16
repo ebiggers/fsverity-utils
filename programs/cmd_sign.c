@@ -105,7 +105,7 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 		tree_params.hash_algorithm = FS_VERITY_HASH_ALG_DEFAULT;
 
 	if (tree_params.block_size == 0)
-		tree_params.block_size = get_default_block_size();
+		tree_params.block_size = 4096;
 
 	if (sig_params.keyfile == NULL) {
 		error_msg("Missing --key argument");

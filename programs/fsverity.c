@@ -12,7 +12,6 @@
 #include "fsverity.h"
 
 #include <limits.h>
-#include <unistd.h>
 
 static const struct fsverity_command {
 	const char *name;
@@ -190,19 +189,6 @@ bool parse_salt_option(const char *arg, u8 **salt_ptr, u32 *salt_size_ptr)
 		return false;
 	}
 	return true;
-}
-
-u32 get_default_block_size(void)
-{
-	long n = sysconf(_SC_PAGESIZE);
-
-	if (n <= 0 || n >= INT_MAX || !is_power_of_2(n)) {
-		fprintf(stderr,
-			"Warning: invalid _SC_PAGESIZE (%ld).  Assuming 4K blocks.\n",
-			n);
-		return 4096;
-	}
-	return n;
 }
 
 int main(int argc, char *argv[])

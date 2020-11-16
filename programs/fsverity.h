@@ -46,6 +46,5 @@ void usage(const struct fsverity_command *cmd, FILE *fp);
 bool parse_hash_alg_option(const char *arg, u32 *alg_ptr);
 bool parse_block_size_option(const char *arg, u32 *size_ptr);
 bool parse_salt_option(const char *arg, u8 **salt_ptr, u32 *salt_size_ptr);
-u32 get_default_block_size(void);
 
 #endif /* PROGRAMS_FSVERITY_H */

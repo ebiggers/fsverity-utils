@@ -114,7 +114,7 @@ int fsverity_cmd_enable(const struct fsverity_command *cmd,
 		arg.hash_algorithm = FS_VERITY_HASH_ALG_DEFAULT;
 
 	if (arg.block_size == 0)
-		arg.block_size = get_default_block_size();
+		arg.block_size = 4096;
 
 	if (!open_file(&file, argv[0], O_RDONLY, 0))
 		goto out_err;
