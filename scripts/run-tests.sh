@@ -175,10 +175,6 @@ log "Run sparse"
 log "Run clang static analyzer"
 scan-build --status-bugs make CFLAGS="-O2 -Werror" all test_programs
 
-log "Run gcc static analyzer"
-# Using -O2 here produces a false positive report in fsverity_cmd_sign().
-$MAKE CC=gcc CFLAGS="-O0 -Werror -fanalyzer" all test_programs
-
 log "Run shellcheck"
 shellcheck scripts/*.sh 1>&2
 
