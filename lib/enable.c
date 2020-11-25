@@ -31,6 +31,12 @@ libfsverity_enable_with_sig(int fd,
 		return -EINVAL;
 	}
 
+	if (params->version != 1) {
+		libfsverity_error_msg("unsupported version (%u)",
+				      params->version);
+		return -EINVAL;
+	}
+
 	arg.version = 1;
 	arg.hash_algorithm =
 		params->hash_algorithm ?: FS_VERITY_HASH_ALG_DEFAULT;
