@@ -51,6 +51,15 @@ libfsverity_set_error_callback(void (*cb)(const char *msg))
 	libfsverity_error_cb = cb;
 }
 
+#ifdef _WIN32
+static char *strerror_r(int errnum, char *buf, size_t buflen)
+{
+	strerror_s(buf, buflen, errnum);
+
+	return buf;
+}
+#endif
+
 void libfsverity_do_error_msg(const char *format, va_list va, int err)
 {
 	int saved_errno = errno;

@@ -50,6 +50,17 @@ use `make USE_SHARED_LIB=1` to use dynamic linking instead.
 
 See the `Makefile` for other supported build and installation options.
 
+### Building on Windows
+
+There is minimal support for building Windows executables using MinGW.
+```bash
+    make CC=x86_64-w64-mingw32-gcc
+```
+
+`fsverity.exe` will be built, and it supports the `digest` and `sign` commands.
+
+A Windows build of OpenSSL/libcrypto needs to be available.
+
 ## Examples
 
 ### Basic use

@@ -35,6 +35,12 @@
 cc-option = $(shell if $(CC) $(1) -c -x c /dev/null -o /dev/null > /dev/null 2>&1; \
 	      then echo $(1); fi)
 
+# Support building with MinGW for minimal Windows fsverity.exe, but not for
+# libfsverity. fsverity.exe will be statically linked.
+ifneq ($(findstring -mingw,$(shell $(CC) -dumpmachine 2>/dev/null)),)
+MINGW = 1
+endif
+
 CFLAGS ?= -O2
 
 override CFLAGS := -Wall -Wundef				\
@@ -62,7 +68,13 @@ BINDIR          ?= $(PREFIX)/bin
 INCDIR          ?= $(PREFIX)/include
 LIBDIR          ?= $(PREFIX)/lib
 DESTDIR         ?=
+ifneq ($(MINGW),1)
 PKGCONF         ?= pkg-config
+else
+PKGCONF         := false
+EXEEXT          := .exe
+endif
+FSVERITY        := fsverity$(EXEEXT)
 
 # Rebuild if a user-specified setting that affects the build changed.
 .build-config: FORCE
@@ -87,9 +99,9 @@ CFLAGS          += $(shell "$(PKGCONF)" libcrypto --cflags 2>/dev/null || echo)
 # If we are dynamically linking, when running tests we need to override
 # LD_LIBRARY_PATH as no RPATH is set
 ifdef USE_SHARED_LIB
-RUN_FSVERITY    = LD_LIBRARY_PATH=./ $(TEST_WRAPPER_PROG) ./fsverity
+RUN_FSVERITY    = LD_LIBRARY_PATH=./ $(TEST_WRAPPER_PROG) ./$(FSVERITY)
 else
-RUN_FSVERITY    = $(TEST_WRAPPER_PROG) ./fsverity
+RUN_FSVERITY    = $(TEST_WRAPPER_PROG) ./$(FSVERITY)
 endif
 
 ##############################################################################
@@ -99,6 +111,9 @@ endif
 SOVERSION       := 0
 LIB_CFLAGS      := $(CFLAGS) -fvisibility=hidden
 LIB_SRC         := $(wildcard lib/*.c)
+ifeq ($(MINGW),1)
+LIB_SRC         := $(filter-out lib/enable.c,${LIB_SRC})
+endif
 LIB_HEADERS     := $(wildcard lib/*.h) $(COMMON_HEADERS)
 STATIC_LIB_OBJ  := $(LIB_SRC:.c=.o)
 SHARED_LIB_OBJ  := $(LIB_SRC:.c=.shlib.o)
@@ -141,12 +156,15 @@ PROG_COMMON_SRC   := programs/utils.c
 PROG_COMMON_OBJ   := $(PROG_COMMON_SRC:.c=.o)
 FSVERITY_PROG_OBJ := $(PROG_COMMON_OBJ)		\
 		     programs/cmd_digest.o	\
-		     programs/cmd_enable.o	\
-		     programs/cmd_measure.o	\
 		     programs/cmd_sign.o	\
 		     programs/fsverity.o
+ifneq ($(MINGW),1)
+FSVERITY_PROG_OBJ += \
+		     programs/cmd_enable.o	\
+		     programs/cmd_measure.o
+endif
 TEST_PROG_SRC     := $(wildcard programs/test_*.c)
-TEST_PROGRAMS     := $(TEST_PROG_SRC:programs/%.c=%)
+TEST_PROGRAMS     := $(TEST_PROG_SRC:programs/%.c=%$(EXEEXT))
 
 # Compile program object files
 $(ALL_PROG_OBJ): %.o: %.c $(ALL_PROG_HEADERS) .build-config
@@ -154,18 +172,18 @@ $(ALL_PROG_OBJ): %.o: %.c $(ALL_PROG_HEADERS) .build-config
 
 # Link the fsverity program
 ifdef USE_SHARED_LIB
-fsverity: $(FSVERITY_PROG_OBJ) libfsverity.so
+$(FSVERITY): $(FSVERITY_PROG_OBJ) libfsverity.so
 	$(QUIET_CCLD) $(CC) -o $@ $(FSVERITY_PROG_OBJ) \
 		$(CFLAGS) $(LDFLAGS) -L. -lfsverity
 else
-fsverity: $(FSVERITY_PROG_OBJ) libfsverity.a
+$(FSVERITY): $(FSVERITY_PROG_OBJ) libfsverity.a
 	$(QUIET_CCLD) $(CC) -o $@ $+ $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 endif
 
-DEFAULT_TARGETS += fsverity
+DEFAULT_TARGETS += $(FSVERITY)
 
 # Link the test programs
-$(TEST_PROGRAMS): %: programs/%.o $(PROG_COMMON_OBJ) libfsverity.a
+$(TEST_PROGRAMS): %$(EXEEXT): programs/%.o $(PROG_COMMON_OBJ) libfsverity.a
 	$(QUIET_CCLD) $(CC) -o $@ $+ $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 ##############################################################################
@@ -184,25 +202,25 @@ test_programs:$(TEST_PROGRAMS)
 
 # This just runs some quick, portable tests.  Use scripts/run-tests.sh if you
 # want to run the full tests.
-check:fsverity test_programs
+check:$(FSVERITY) test_programs
 	for prog in $(TEST_PROGRAMS); do \
 		$(TEST_WRAPPER_PROG) ./$$prog || exit 1; \
 	done
 	$(RUN_FSVERITY) --help > /dev/null
 	$(RUN_FSVERITY) --version > /dev/null
-	$(RUN_FSVERITY) sign fsverity fsverity.sig \
+	$(RUN_FSVERITY) sign $(FSVERITY) fsverity.sig \
 		--key=testdata/key.pem --cert=testdata/cert.pem > /dev/null
-	$(RUN_FSVERITY) sign fsverity fsverity.sig --hash=sha512 \
+	$(RUN_FSVERITY) sign $(FSVERITY) fsverity.sig --hash=sha512 \
 		--block-size=512 --salt=12345678 \
 		--key=testdata/key.pem --cert=testdata/cert.pem > /dev/null
-	$(RUN_FSVERITY) digest fsverity --hash=sha512 \
+	$(RUN_FSVERITY) digest $(FSVERITY) --hash=sha512 \
 		--block-size=512 --salt=12345678 > /dev/null
 	rm -f fsverity.sig
 	@echo "All tests passed!"
 
 install:all
 	install -d $(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(INCDIR) $(DESTDIR)$(BINDIR)
-	install -m755 fsverity $(DESTDIR)$(BINDIR)
+	install -m755 $(FSVERITY) $(DESTDIR)$(BINDIR)
 	install -m644 libfsverity.a $(DESTDIR)$(LIBDIR)
 	install -m755 libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)
 	ln -sf libfsverity.so.$(SOVERSION) $(DESTDIR)$(LIBDIR)/libfsverity.so
@@ -215,7 +233,7 @@ install:all
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/fsverity
+	rm -f $(DESTDIR)$(BINDIR)/$(FSVERITY)
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.a
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.so.$(SOVERSION)
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.so

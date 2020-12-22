@@ -28,6 +28,7 @@ static const struct fsverity_command {
 "    fsverity digest FILE...\n"
 "               [--hash-alg=HASH_ALG] [--block-size=BLOCK_SIZE] [--salt=SALT]\n"
 "               [--compact] [--for-builtin-sig]\n"
+#ifndef _WIN32
 	}, {
 		.name = "enable",
 		.func = fsverity_cmd_enable,
@@ -43,6 +44,7 @@ static const struct fsverity_command {
 "Display the fs-verity digest of the given verity file(s)",
 		.usage_str =
 "    fsverity measure FILE...\n"
+#endif /* _WIN32 */
 	}, {
 		.name = "sign",
 		.func = fsverity_cmd_sign,
