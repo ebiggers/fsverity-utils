@@ -87,9 +87,9 @@ CFLAGS          += $(shell "$(PKGCONF)" libcrypto --cflags 2>/dev/null || echo)
 # If we are dynamically linking, when running tests we need to override
 # LD_LIBRARY_PATH as no RPATH is set
 ifdef USE_SHARED_LIB
-RUN_FSVERITY    = LD_LIBRARY_PATH=./ ./fsverity
+RUN_FSVERITY    = LD_LIBRARY_PATH=./ $(TEST_WRAPPER_PROG) ./fsverity
 else
-RUN_FSVERITY    = ./fsverity
+RUN_FSVERITY    = $(TEST_WRAPPER_PROG) ./fsverity
 endif
 
 ##############################################################################
