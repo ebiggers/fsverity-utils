@@ -44,7 +44,7 @@ static const struct fsverity_command {
 "Display the fs-verity digest of the given verity file(s)",
 		.usage_str =
 "    fsverity measure FILE...\n"
-#endif /* _WIN32 */
+#endif /* !_WIN32 */
 	}, {
 		.name = "sign",
 		.func = fsverity_cmd_sign,
