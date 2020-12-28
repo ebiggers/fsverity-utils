@@ -169,6 +169,12 @@ $MAKE CFLAGS="-O2 -Werror -funsigned-char" check
 log "Build and test using -fsigned-char"
 $MAKE CFLAGS="-O2 -Werror -fsigned-char" check
 
+log "Cross-compile for Windows (32-bit)"
+$MAKE CC=i686-w64-mingw32-gcc CFLAGS="-O2 -Werror"
+
+log "Cross-compile for Windows (64-bit)"
+$MAKE CC=x86_64-w64-mingw32-gcc CFLAGS="-O2 -Werror"
+
 log "Run sparse"
 ./scripts/run-sparse.sh
 
