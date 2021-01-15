@@ -160,6 +160,7 @@ FSVERITY_PROG_OBJ := $(PROG_COMMON_OBJ)		\
 		     programs/fsverity.o
 ifneq ($(MINGW),1)
 FSVERITY_PROG_OBJ += \
+		     programs/cmd_dump_metadata.o \
 		     programs/cmd_enable.o	\
 		     programs/cmd_measure.o
 endif

@@ -27,6 +27,8 @@ enum {
 	OPT_FOR_BUILTIN_SIG,
 	OPT_HASH_ALG,
 	OPT_KEY,
+	OPT_LENGTH,
+	OPT_OFFSET,
 	OPT_SALT,
 	OPT_SIGNATURE,
 };
@@ -36,6 +38,10 @@ struct fsverity_command;
 /* cmd_digest.c */
 int fsverity_cmd_digest(const struct fsverity_command *cmd,
 			int argc, char *argv[]);
+
+/* cmd_dump_metadata.c */
+int fsverity_cmd_dump_metadata(const struct fsverity_command *cmd,
+			       int argc, char *argv[]);
 
 /* cmd_enable.c */
 int fsverity_cmd_enable(const struct fsverity_command *cmd,

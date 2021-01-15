@@ -30,6 +30,12 @@ static const struct fsverity_command {
 "               [--compact] [--for-builtin-sig]\n"
 #ifndef _WIN32
 	}, {
+		.name = "dump_metadata",
+		.func = fsverity_cmd_dump_metadata,
+		.short_desc = "Dump the fs-verity metadata of the given file",
+		.usage_str =
+"    fsverity dump_metadata TYPE FILE [--offset=OFFSET] [--length=LENGTH]\n"
+	}, {
 		.name = "enable",
 		.func = fsverity_cmd_enable,
 		.short_desc = "Enable fs-verity on a file",
