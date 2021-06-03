@@ -11,6 +11,7 @@
 
 #include "fsverity.h"
 
+#include <fcntl.h>
 #include <limits.h>
 
 static const struct fsverity_command {
@@ -27,6 +28,7 @@ static const struct fsverity_command {
 		.usage_str =
 "    fsverity digest FILE...\n"
 "               [--hash-alg=HASH_ALG] [--block-size=BLOCK_SIZE] [--salt=SALT]\n"
+"               [--out-merkle-tree=FILE] [--out-descriptor=FILE]\n"
 "               [--compact] [--for-builtin-sig]\n"
 #ifndef _WIN32
 	}, {
@@ -58,6 +60,7 @@ static const struct fsverity_command {
 		.usage_str =
 "    fsverity sign FILE OUT_SIGFILE --key=KEYFILE\n"
 "               [--hash-alg=HASH_ALG] [--block-size=BLOCK_SIZE] [--salt=SALT]\n"
+"               [--out-merkle-tree=FILE] [--out-descriptor=FILE]\n"
 "               [--cert=CERTFILE]\n"
 	}
 };
@@ -200,6 +203,74 @@ static bool parse_salt_option(const char *arg, u8 **salt_ptr,
 	return true;
 }
 
+struct metadata_callback_ctx {
+	struct filedes merkle_tree_file;
+	struct filedes descriptor_file;
+	struct libfsverity_metadata_callbacks callbacks;
+};
+
+static int handle_merkle_tree_size(void *_ctx, u64 size)
+{
+	struct metadata_callback_ctx *ctx = _ctx;
+
+	if (!preallocate_file(&ctx->merkle_tree_file, size))
+		return -EIO;
+	return 0;
+}
+
+static int handle_merkle_tree_block(void *_ctx, const void *block, size_t size,
+				    u64 offset)
+{
+	struct metadata_callback_ctx *ctx = _ctx;
+
+	if (!full_pwrite(&ctx->merkle_tree_file, block, size, offset))
+		return -EIO;
+	return 0;
+}
+
+static int handle_descriptor(void *_ctx, const void *descriptor, size_t size)
+{
+	struct metadata_callback_ctx *ctx = _ctx;
+
+	if (!full_write(&ctx->descriptor_file, descriptor, size))
+		return -EIO;
+	return 0;
+}
+
+static bool parse_out_metadata_option(int opt_char, const char *arg,
+				      const struct libfsverity_metadata_callbacks **cbs)
+{
+	struct metadata_callback_ctx *ctx;
+	struct filedes *file;
+	const char *opt_name;
+
+	if (*cbs) {
+		ctx = (*cbs)->ctx;
+	} else {
+		ctx = xzalloc(sizeof(*ctx));
+		ctx->merkle_tree_file.fd = -1;
+		ctx->descriptor_file.fd = -1;
+		ctx->callbacks.ctx = ctx;
+		*cbs = &ctx->callbacks;
+	}
+
+	if (opt_char == OPT_OUT_MERKLE_TREE) {
+		file = &ctx->merkle_tree_file;
+		opt_name = "--out-merkle-tree";
+		ctx->callbacks.merkle_tree_size = handle_merkle_tree_size;
+		ctx->callbacks.merkle_tree_block = handle_merkle_tree_block;
+	} else {
+		file = &ctx->descriptor_file;
+		opt_name = "--out-descriptor";
+		ctx->callbacks.descriptor = handle_descriptor;
+	}
+	if (file->fd >= 0) {
+		error_msg("%s can only be specified once", opt_name);
+		return false;
+	}
+	return open_file(file, arg, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+}
+
 bool parse_tree_param(int opt_char, const char *arg,
 		      struct libfsverity_merkle_tree_params *params)
 {
@@ -211,15 +282,30 @@ bool parse_tree_param(int opt_char, const char *arg,
 	case OPT_SALT:
 		return parse_salt_option(arg, (u8 **)&params->salt,
 					 &params->salt_size);
+	case OPT_OUT_MERKLE_TREE:
+	case OPT_OUT_DESCRIPTOR:
+		return parse_out_metadata_option(opt_char, arg,
+						 &params->metadata_callbacks);
 	default:
 		ASSERT(0);
 	}
 }
 
-void destroy_tree_params(struct libfsverity_merkle_tree_params *params)
+bool destroy_tree_params(struct libfsverity_merkle_tree_params *params)
 {
+	bool ok = true;
+
 	free((u8 *)params->salt);
+	if (params->metadata_callbacks) {
+		struct metadata_callback_ctx *ctx =
+			params->metadata_callbacks->ctx;
+
+		ok &= filedes_close(&ctx->merkle_tree_file);
+		ok &= filedes_close(&ctx->descriptor_file);
+		free(ctx);
+	}
 	memset(params, 0, sizeof(*params));
+	return ok;
 }
 
 int main(int argc, char *argv[])

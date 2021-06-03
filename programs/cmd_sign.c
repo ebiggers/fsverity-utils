@@ -27,11 +27,13 @@ static bool write_signature(const char *filename, const u8 *sig, u32 sig_size)
 }
 
 static const struct option longopts[] = {
-	{"hash-alg",	required_argument, NULL, OPT_HASH_ALG},
-	{"block-size",	required_argument, NULL, OPT_BLOCK_SIZE},
-	{"salt",	required_argument, NULL, OPT_SALT},
-	{"key",		required_argument, NULL, OPT_KEY},
-	{"cert",	required_argument, NULL, OPT_CERT},
+	{"hash-alg",	    required_argument, NULL, OPT_HASH_ALG},
+	{"block-size",	    required_argument, NULL, OPT_BLOCK_SIZE},
+	{"salt",	    required_argument, NULL, OPT_SALT},
+	{"out-merkle-tree", required_argument, NULL, OPT_OUT_MERKLE_TREE},
+	{"out-descriptor",  required_argument, NULL, OPT_OUT_DESCRIPTOR},
+	{"key",		    required_argument, NULL, OPT_KEY},
+	{"cert",	    required_argument, NULL, OPT_CERT},
 	{NULL, 0, NULL, 0}
 };
 
@@ -54,6 +56,8 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 		case OPT_HASH_ALG:
 		case OPT_BLOCK_SIZE:
 		case OPT_SALT:
+		case OPT_OUT_MERKLE_TREE:
+		case OPT_OUT_DESCRIPTOR:
 			if (!parse_tree_param(c, optarg, &tree_params))
 				goto out_usage;
 			break;
@@ -117,7 +121,8 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 	status = 0;
 out:
 	filedes_close(&file);
-	destroy_tree_params(&tree_params);
+	if (!destroy_tree_params(&tree_params) && status == 0)
+		status = 1;
 	free(digest);
 	free(sig);
 	return status;

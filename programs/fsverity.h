@@ -29,6 +29,8 @@ enum {
 	OPT_KEY,
 	OPT_LENGTH,
 	OPT_OFFSET,
+	OPT_OUT_DESCRIPTOR,
+	OPT_OUT_MERKLE_TREE,
 	OPT_SALT,
 	OPT_SIGNATURE,
 };
@@ -59,6 +61,6 @@ int fsverity_cmd_sign(const struct fsverity_command *cmd,
 void usage(const struct fsverity_command *cmd, FILE *fp);
 bool parse_tree_param(int opt_char, const char *arg,
 		      struct libfsverity_merkle_tree_params *params);
-void destroy_tree_params(struct libfsverity_merkle_tree_params *params);
+bool destroy_tree_params(struct libfsverity_merkle_tree_params *params);
 
 #endif /* PROGRAMS_FSVERITY_H */
