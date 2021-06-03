@@ -61,8 +61,18 @@ struct libfsverity_merkle_tree_params {
 	/** @reserved1: must be 0 */
 	uint64_t reserved1[8];
 
+	/**
+	 * @metadata_callbacks: if non-NULL, this gives a set of callback
+	 * functions to which libfsverity_compute_digest() will pass the Merkle
+	 * tree blocks and fs-verity descriptor after they are computed.
+	 * Normally this isn't useful, but this can be needed in rare cases
+	 * where the metadata needs to be consumed by something other than one
+	 * of the native Linux kernel implementations of fs-verity.
+	 */
+	const struct libfsverity_metadata_callbacks *metadata_callbacks;
+
 	/** @reserved2: must be 0 */
-	uintptr_t reserved2[8];
+	uintptr_t reserved2[7];
 };
 
 struct libfsverity_digest {
@@ -76,6 +86,37 @@ struct libfsverity_signature_params {
 	const char *certfile;		/* path to certificate (PEM format) */
 	uint64_t reserved1[8];		/* must be 0 */
 	uintptr_t reserved2[8];		/* must be 0 */
+};
+
+struct libfsverity_metadata_callbacks {
+
+	/** @ctx: context passed to the below callbacks (opaque to library) */
+	void *ctx;
+
+	/**
+	 * @merkle_tree_size: if non-NULL, called with the total size of the
+	 * Merkle tree in bytes, prior to any call to @merkle_tree_block.  Must
+	 * return 0 on success, or a negative errno value on failure.
+	 */
+	int (*merkle_tree_size)(void *ctx, uint64_t size);
+
+	/**
+	 * @merkle_tree_block: if non-NULL, called with each block of the
+	 * Merkle tree after it is computed.  The offset is the offset in bytes
+	 * to the block within the Merkle tree, using the Merkle tree layout
+	 * used by FS_IOC_READ_VERITY_METADATA.  The offsets won't necessarily
+	 * be in increasing order.  Must return 0 on success, or a negative
+	 * errno value on failure.
+	 */
+	int (*merkle_tree_block)(void *ctx, const void *block, size_t size,
+				 uint64_t offset);
+
+	/**
+	 * @descriptor: if non-NULL, called with the fs-verity descriptor after
+	 * it is computed.  Must return 0 on success, or a negative errno value
+	 * on failure.
+	 */
+	int (*descriptor)(void *ctx, const void *descriptor, size_t size);
 };
 
 /*
@@ -101,7 +142,8 @@ typedef int (*libfsverity_read_fn_t)(void *fd, void *buf, size_t count);
  *
  * Returns:
  * * 0 for success, -EINVAL for invalid input arguments, -ENOMEM if libfsverity
- *   failed to allocate memory, or an error returned by @read_fn.
+ *   failed to allocate memory, or an error returned by @read_fn or by one of
+ *   the @params->metadata_callbacks.
  * * digest_ret returns a pointer to the digest on success. The digest object
  *   is allocated by libfsverity and must be freed by the caller using free().
  */
