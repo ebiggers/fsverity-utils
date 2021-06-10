@@ -25,11 +25,17 @@ git clean -fdx
 
 major=$(echo "$VERS" | cut -d. -f1)
 minor=$(echo "$VERS" | cut -d. -f2)
+month=$(LC_ALL=C date +%B)
+year=$(LC_ALL=C date +%Y)
+
 sed -E -i -e "/FSVERITY_UTILS_MAJOR_VERSION/s/[0-9]+/$major/" \
 	  -e "/FSVERITY_UTILS_MINOR_VERSION/s/[0-9]+/$minor/" \
 	  include/libfsverity.h
 sed -E -i "/Version:/s/[0-9]+\.[0-9]+/$VERS/" \
 	  lib/libfsverity.pc.in
+sed -E -i -e "/^% /s/fsverity-utils v[0-9]+(\.[0-9]+)+/fsverity-utils v$VERS/" \
+	  -e "/^% /s/[a-zA-Z]+ 2[0-9]{3}/$month $year/" \
+	  man/*.[1-9].md
 git commit -a --signoff --message="v$VERS"
 git tag --sign "v$VERS" --message="$PKG"
 

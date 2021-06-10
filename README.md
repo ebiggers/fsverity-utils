@@ -24,26 +24,31 @@ See `libfsverity.h` for the API of this library.
 
 ## Building and installing
 
-fsverity-utils uses the OpenSSL library, so you first must install the
-needed development files.  For example, on Debian-based systems, run:
+To build fsverity-utils, first install the needed build dependencies.  For
+example, on Debian-based systems, run:
 
 ```bash
     sudo apt-get install libssl-dev
+    sudo apt-get install pandoc  # optional
 ```
 
-OpenSSL must be version 1.0.0 or later.
+OpenSSL must be version 1.0.0 or later.  This is the only runtime dependency.
 
 Then, to build and install fsverity-utils:
 
 ```bash
     make
     sudo make install
+    sudo make install-man  # optional
 ```
 
 By default, the following targets are built and installed: the program
 `fsverity`, the static library `libfsverity.a`, and the shared library
 `libfsverity.so`.  You can also run `make check` to build and run the
 tests, or `make help` to display all available build targets.
+
+`make install-man` installs the `fsverity.1` manual page.  This step requires
+that `pandoc` be installed.
 
 By default, `fsverity` is statically linked to `libfsverity`.  You can
 use `make USE_SHARED_LIB=1` to use dynamic linking instead.
@@ -62,6 +67,9 @@ There is minimal support for building Windows executables using MinGW.
 A Windows build of OpenSSL/libcrypto needs to be available.
 
 ## Examples
+
+Full usage information for `fsverity` can be found in the manual page
+(`man fsverity`).  Here, we just show some typical examples.
 
 ### Basic use
 

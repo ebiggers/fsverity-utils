@@ -25,6 +25,9 @@
 # Define LIBDIR to override where to install libraries, like './configure
 # --libdir' in autotools-based projects (default: PREFIX/lib)
 #
+# Define MANDIR to override where to install man pages, like './configure
+# --mandir' in autotools-based projects (default: PREFIX/share/man)
+#
 # Define DESTDIR to override the installation destination directory
 # (default: empty string)
 #
@@ -61,12 +64,14 @@ QUIET_CCLD      = @echo '  CCLD    ' $@;
 QUIET_AR        = @echo '  AR      ' $@;
 QUIET_LN        = @echo '  LN      ' $@;
 QUIET_GEN       = @echo '  GEN     ' $@;
+QUIET_PANDOC    = @echo '  PANDOC  ' $@;
 endif
 USE_SHARED_LIB  ?=
 PREFIX          ?= /usr/local
 BINDIR          ?= $(PREFIX)/bin
 INCDIR          ?= $(PREFIX)/include
 LIBDIR          ?= $(PREFIX)/lib
+MANDIR          ?= $(PREFIX)/share/man
 DESTDIR         ?=
 ifneq ($(MINGW),1)
 PKGCONF         ?= pkg-config
@@ -92,6 +97,7 @@ FSVERITY        := fsverity$(EXEEXT)
 	fi
 
 DEFAULT_TARGETS :=
+EXTRA_TARGETS   :=
 COMMON_HEADERS  := $(wildcard common/*.h)
 LDLIBS          := $(shell "$(PKGCONF)" libcrypto --libs 2>/dev/null || echo -lcrypto)
 CFLAGS          += $(shell "$(PKGCONF)" libcrypto --cflags 2>/dev/null || echo)
@@ -187,9 +193,22 @@ DEFAULT_TARGETS += $(FSVERITY)
 $(TEST_PROGRAMS): %$(EXEEXT): programs/%.o $(PROG_COMMON_OBJ) libfsverity.a
 	$(QUIET_CCLD) $(CC) -o $@ $+ $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 
+EXTRA_TARGETS += $(TEST_PROGRAMS)
+
 ##############################################################################
 
-SPECIAL_TARGETS := all test_programs check install uninstall help clean
+#### Manual pages
+
+man/fsverity.1:man/fsverity.1.md
+	$(QUIET_PANDOC) pandoc $+ -s -t man > $@
+
+MAN_PAGES := man/fsverity.1
+EXTRA_TARGETS += $(MAN_PAGES)
+
+##############################################################################
+
+SPECIAL_TARGETS := all test_programs check install install-man uninstall \
+		   help clean
 
 FORCE:
 
@@ -233,6 +252,10 @@ install:all
 		> $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 
+install-man:$(MAN_PAGES)
+	install -d $(DESTDIR)$(MANDIR)/man1
+	install -m644 $+ $(DESTDIR)$(MANDIR)/man1/
+
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(FSVERITY)
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.a
@@ -240,15 +263,18 @@ uninstall:
 	rm -f $(DESTDIR)$(LIBDIR)/libfsverity.so
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 	rm -f $(DESTDIR)$(INCDIR)/libfsverity.h
+	for page in $(notdir $(MAN_PAGES)); do \
+		rm -f $(DESTDIR)$(MANDIR)/man1/$$page; \
+	done
 
 help:
 	@echo "Available targets:"
 	@echo "------------------"
-	@for target in $(DEFAULT_TARGETS) $(TEST_PROGRAMS) $(SPECIAL_TARGETS); \
+	@for target in $(DEFAULT_TARGETS) $(EXTRA_TARGETS) $(SPECIAL_TARGETS); \
 	do \
 		echo $$target; \
 	done
 
 clean:
-	rm -f $(DEFAULT_TARGETS) $(TEST_PROGRAMS) \
+	rm -f $(DEFAULT_TARGETS) $(EXTRA_TARGETS) \
 		lib/*.o programs/*.o .build-config fsverity.sig

@@ -101,7 +101,7 @@ log "Check that all files have license and copyright info"
 list="$TMPDIR/filelist"
 filter_license_info() {
 	# files to exclude from license and copyright info checks
-	grep -E -v '(\.gitignore|LICENSE|NEWS|README|testdata|fsverity_uapi\.h|libfsverity\.pc\.in)'
+	grep -E -v '(\.gitignore|LICENSE|.*\.md|testdata|fsverity_uapi\.h|libfsverity\.pc\.in)'
 }
 git grep -L 'SPDX-License-Identifier: MIT' \
 	| filter_license_info > "$list" || true
