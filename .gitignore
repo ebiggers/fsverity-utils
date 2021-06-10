@@ -1,4 +1,5 @@
 *.a
+*.exe
 *.o
 *.patch
 *.so
