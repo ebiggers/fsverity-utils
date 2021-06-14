@@ -1,4 +1,4 @@
-% FSVERITY(1) fsverity-utils v1.3 | User Commands
+% FSVERITY(1) fsverity-utils v1.4 | User Commands
 %
 % June 2021
 

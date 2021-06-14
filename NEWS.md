@@ -1,5 +1,16 @@
 # fsverity-utils release notes
 
+## Version 1.4
+
+* Added a manual page for the `fsverity` utility.
+
+* Added the `fsverity dump_metadata` subcommand.
+
+* Added the `--out-merkle-tree` and `--out-descriptor` options to
+  `fsverity digest` and `fsverity sign`.
+
+* Added metadata callbacks support to `libfsverity_compute_digest()`.
+
 ## Version 1.3
 
 * Added a `fsverity digest` subcommand.
