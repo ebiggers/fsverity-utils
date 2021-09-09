@@ -11,7 +11,7 @@ fsverity - userspace utility for fs-verity
 **fsverity dump_metadata** [*OPTION*...] *TYPE* *FILE* \
 **fsverity enable** [*OPTION*...] *FILE* \
 **fsverity measure** *FILE*... \
-**fsverity sign \-\-key**=*KEYFILE* [*OPTION*...] *FILE* *OUT_SIGFILE*
+**fsverity sign** [*OPTION*...] *FILE* *OUT_SIGFILE*
 
 # DESCRIPTION
 
@@ -149,11 +149,17 @@ for each file regardless of the size of the file.
 
 **fsverity measure** does not accept any options.
 
-## **fsverity sign** **\-\-key**=*KEYFILE* [*OPTION*...] *FILE* *OUT_SIGFILE*
+## **fsverity sign** [*OPTION*...] *FILE* *OUT_SIGFILE*
 
 Sign the given file for fs-verity, in a way that is compatible with the Linux
 kernel's fs-verity built-in signature verification support.  The signature will
 be written to *OUT_SIGFILE* in PKCS#7 DER format.
+
+The private key can be specified either by key file or by PKCS#11 token.  To use
+a key file, provide **\-\-key** and optionally **\-\-cert**.  To use a PKCS#11
+token, provide **\-\-pkcs11-engine**, **\-\-pkcs11-module**, **\-\-cert**, and
+optionally **\-\-pkcs11-keyid**.  PKCS#11 token support is unavailable when
+fsverity-utils was built with BoringSSL rather than OpenSSL.
 
 Options accepted by **fsverity sign**:
 
@@ -163,20 +169,34 @@ Options accepted by **fsverity sign**:
 **\-\-cert**=*CERTFILE*
 :   Specifies the file that contains the certificate, in PEM format.  This
     option is required if *KEYFILE* contains only the private key and not also
-    the certificate.
+    the certificate, or if a PKCS#11 token is used.
 
 **\-\-hash-alg**=*HASH_ALG*
 :   Same as for **fsverity digest**.
 
 **\-\-key**=*KEYFILE*
 :   Specifies the file that contains the private key, in PEM format.  This
-    option is required.
+    option is required when not using a PKCS#11 token.
 
 **\-\-out-descriptor**=*FILE*
 :   Same as for **fsverity digest**.
 
 **\-\-out-merkle-tree**=*FILE*
 :   Same as for **fsverity digest**.
+
+**\-\-pkcs11-engine**=*SOFILE*
+:   Specifies the path to the OpenSSL PKCS#11 engine file.  This typically will
+    be a path to the libp11 .so file.  This option is required when using a
+    PKCS#11 token.
+
+**\-\-pkcs11-keyid**=*KEYID*
+:   Specifies the key identifier in the form of a PKCS#11 URI.  If not provided,
+    the default key associated with the token is used.  This option is only
+    applicable when using a PKCS#11 token.
+
+**\-\-pkcs11-module**=*SOFILE*
+:   Specifies the path to the PKCS#11 token-specific module library.  This
+    option is required when using a PKCS#11 token.
 
 **\-\-salt**=*SALT*
 :   Same as for **fsverity digest**.
