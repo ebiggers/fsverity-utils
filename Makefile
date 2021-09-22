@@ -44,8 +44,13 @@ ifneq ($(findstring -mingw,$(shell $(CC) -dumpmachine 2>/dev/null)),)
 MINGW = 1
 endif
 
+# Set the CFLAGS.  First give the warning-related flags (unconditionally, though
+# the user can override any of them by specifying the opposite flag); then give
+# the user-specifed CFLAGS, defaulting to -O2 if none were specified.
+#
+# Use -Wno-deprecated-declarations to avoid warnings about the Engine API having
+# been deprecated in OpenSSL 3.0; the replacement isn't ready yet.
 CFLAGS ?= -O2
-
 override CFLAGS := -Wall -Wundef				\
 	$(call cc-option,-Wdeclaration-after-statement)		\
 	$(call cc-option,-Wimplicit-fallthrough)		\
@@ -54,6 +59,7 @@ override CFLAGS := -Wall -Wundef				\
 	$(call cc-option,-Wstrict-prototypes)			\
 	$(call cc-option,-Wunused-parameter)			\
 	$(call cc-option,-Wvla)					\
+	$(call cc-option,-Wno-deprecated-declarations)		\
 	$(CFLAGS)
 
 override CPPFLAGS := -Iinclude -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE $(CPPFLAGS)
