@@ -38,7 +38,7 @@ error_msg_openssl(const char *format, ...)
 	va_list va;
 
 	va_start(va, format);
-	libfsverity_do_error_msg(format, va, 0);
+	libfsverity_do_error_msg(format, va);
 	va_end(va);
 
 	if (ERR_peek_error() == 0)
