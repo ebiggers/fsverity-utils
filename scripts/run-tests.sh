@@ -214,9 +214,11 @@ TEST_FUNCS+=(valgrind_test)
 boringssl_test()
 {
 	log "Build and test using BoringSSL instead of OpenSSL"
-	BSSL=$HOME/src/boringssl
-	$MAKE CFLAGS="-O2 -Werror" LDFLAGS="-L$BSSL/build/crypto" \
-		CPPFLAGS="-I$BSSL/include" LDLIBS="-lcrypto -lpthread" check
+	log "-> Building BoringSSL"
+	$MAKE boringssl
+	log "-> Building fsverity-utils linked to BoringSSL"
+	$MAKE CFLAGS="-O2 -Werror" LDFLAGS="-Lboringssl/build/crypto" \
+		CPPFLAGS="-Iboringssl/include" LDLIBS="-lcrypto -lpthread" check
 }
 TEST_FUNCS+=(boringssl_test)
 

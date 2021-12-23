@@ -6,6 +6,8 @@
 *.so
 *.so.*
 /.build-config
+/boringssl
+/boringssl.tar.gz
 /fsverity
 /fsverity.sig
 /run-tests.log

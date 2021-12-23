@@ -213,6 +213,21 @@ EXTRA_TARGETS += $(MAN_PAGES)
 
 ##############################################################################
 
+# Support for downloading and building BoringSSL.  The purpose of this is to
+# allow testing builds of fsverity-utils that link to BoringSSL instead of
+# OpenSSL, without having to use a system that uses BoringSSL natively.
+
+boringssl:
+	rm -rf boringssl boringssl.tar.gz
+	curl -s -o boringssl.tar.gz \
+		https://boringssl.googlesource.com/boringssl/+archive/refs/heads/master.tar.gz
+	mkdir boringssl
+	tar xf boringssl.tar.gz -C boringssl
+	cmake -B boringssl/build boringssl
+	$(MAKE) -C boringssl/build $(MAKEFLAGS)
+
+##############################################################################
+
 SPECIAL_TARGETS := all test_programs check install install-man uninstall \
 		   help clean
 
