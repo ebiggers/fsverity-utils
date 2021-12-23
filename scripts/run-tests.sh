@@ -199,7 +199,7 @@ sanitizers_test()
 
 	log "Build and test with clang + CFI"
 	$MAKE CC=clang CFLAGS="-O2 -Werror -fsanitize=cfi -flto -fvisibility=hidden" \
-		check
+		AR=llvm-ar check
 }
 TEST_FUNCS+=(sanitizers_test)
 
