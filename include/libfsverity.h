@@ -186,13 +186,13 @@ libfsverity_compute_digest(void *fd, libfsverity_read_fn_t read_fn,
 			   struct libfsverity_digest **digest_ret);
 
 /**
- * libfsverity_sign_digest() - Sign previously computed digest of a file
- *          This signature is used by the filesystem to validate the signed file
- *          digest against a public key loaded into the .fs-verity kernel
- *          keyring, when CONFIG_FS_VERITY_BUILTIN_SIGNATURES is enabled. The
- *          signature is formatted as PKCS#7 stored in DER format. See
- *          Documentation/filesystems/fsverity.rst in the kernel source tree for
- *          further details.
+ * libfsverity_sign_digest() - Sign a file for built-in signature verification
+ *	    Sign a file digest in a way that is compatible with the Linux
+ *	    kernel's fs-verity built-in signature verification support.  The
+ *	    resulting signature will be a PKCS#7 message in DER format.  Note
+ *	    that this is not the only way to do signatures with fs-verity.  For
+ *	    more details, refer to the fsverity-utils README and to
+ *	    Documentation/filesystems/fsverity.rst in the kernel source tree.
  * @digest: pointer to previously computed digest
  * @sig_params: pointer to the certificate and private key information
  * @sig_ret: Pointer to pointer for signed digest

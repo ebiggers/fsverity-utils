@@ -161,6 +161,10 @@ token, provide **\-\-pkcs11-engine**, **\-\-pkcs11-module**, **\-\-cert**, and
 optionally **\-\-pkcs11-keyid**.  PKCS#11 token support is unavailable when
 fsverity-utils was built with BoringSSL rather than OpenSSL.
 
+**fsverity sign** should only be used if you need compatibility with fs-verity
+built-in signatures.  It is not the only way to do signatures with fs-verity.
+For more information, see the fsverity-utils README.
+
 Options accepted by **fsverity sign**:
 
 **\-\-block-size**=*BLOCK_SIZE*

@@ -56,7 +56,7 @@ static const struct fsverity_command {
 	}, {
 		.name = "sign",
 		.func = fsverity_cmd_sign,
-		.short_desc = "Sign a file for fs-verity",
+		.short_desc = "Sign a file for fs-verity built-in signature verification",
 		.usage_str =
 "    fsverity sign FILE OUT_SIGFILE\n"
 "               [--key=KEYFILE] [--cert=CERTFILE] [--pkcs11-engine=SOFILE]\n"
