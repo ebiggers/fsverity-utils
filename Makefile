@@ -46,7 +46,7 @@ endif
 
 # Set the CFLAGS.  First give the warning-related flags (unconditionally, though
 # the user can override any of them by specifying the opposite flag); then give
-# the user-specifed CFLAGS, defaulting to -O2 if none were specified.
+# the user-specified CFLAGS, defaulting to -O2 if none were specified.
 #
 # Use -Wno-deprecated-declarations to avoid warnings about the Engine API having
 # been deprecated in OpenSSL 3.0; the replacement isn't ready yet.
