@@ -22,7 +22,7 @@ extern "C" {
 #include <stdint.h>
 
 #define FSVERITY_UTILS_MAJOR_VERSION	1
-#define FSVERITY_UTILS_MINOR_VERSION	4
+#define FSVERITY_UTILS_MINOR_VERSION	5
 
 #define FS_VERITY_HASH_ALG_SHA256       1
 #define FS_VERITY_HASH_ALG_SHA512       2
