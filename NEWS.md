@@ -1,5 +1,16 @@
 # fsverity-utils release notes
 
+## Version 1.5
+
+* Made the `fsverity sign` command and the `libfsverity_sign_digest()` function
+  support PKCS#11 tokens.
+
+* Avoided a compiler error when building with musl libc.
+
+* Avoided compiler warnings when building with OpenSSL 3.0.
+
+* Improved documentation and test scripts.
+
 ## Version 1.4
 
 * Added a manual page for the `fsverity` utility.
