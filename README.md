@@ -9,12 +9,8 @@ files, using a hidden Merkle tree (hash tree) associated with the
 file.  It is similar to dm-verity, but implemented at the file level
 rather than at the block device level.  See the [kernel
 documentation](https://www.kernel.org/doc/html/latest/filesystems/fsverity.html)
-for more information about fs-verity.
-
-fs-verity is supported by the ext4 and f2fs filesystems in Linux v5.4
-and later when configured with `CONFIG_FS_VERITY=y` and when the
-`verity` filesystem feature flag has been enabled.  Other filesystems
-might add support for fs-verity in the future.
+for more information about fs-verity, including which filesystems
+support it.
 
 fsverity-utils currently contains just one program, `fsverity`.  The
 `fsverity` program allows you to set up fs-verity protected files.
@@ -100,6 +96,13 @@ get any authenticity protection (as opposed to just integrity
 protection), the output of `fsverity measure` needs to be compared
 against a trusted value.
 
+### With IMA
+
+Since Linux v5.19, the kernel's IMA (Integrity Measurement
+Architecture) subsystem supports using fs-verity file digests in lieu
+of traditional file digests.  This must be configured in the IMA
+policy.  For more information, see the IMA documentation.
+
 ### Using builtin signatures
 
 First, note that fs-verity is essentially just a way of hashing a
@@ -107,7 +110,7 @@ file; it doesn't mandate a specific way of handling signatures.
 There are several possible ways that signatures could be handled:
 
 * Do it entirely in userspace
-* Use IMA appraisal (work-in-progress)
+* Use IMA appraisal
 * Use fs-verity built-in signatures
 
 Any such solution needs two parts: (a) a policy that determines which
@@ -169,10 +172,6 @@ That being said, here are some examples of using built-in signatures:
     # encoded, in case the integrated signing cannot be used:
     fsverity digest file --compact --for-builtin-sig | tr -d '\n' | xxd -p -r | openssl smime -sign -in /dev/stdin ...
 ```
-
-### With IMA
-
-IMA support for fs-verity is planned.
 
 ## Notices
 
