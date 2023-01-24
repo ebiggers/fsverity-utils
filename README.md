@@ -178,14 +178,14 @@ That being said, here are some examples of using built-in signatures:
 fsverity-utils is provided under the terms of the MIT license.  A copy
 of this license can be found in the file named [LICENSE](LICENSE).
 
-Send questions and bug reports to linux-fscrypt@vger.kernel.org.
+Send questions and bug reports to fsverity@lists.linux.dev.
 
 Signed release tarballs for fsverity-utils can be found on
 [kernel.org](https://kernel.org/pub/linux/kernel/people/ebiggers/fsverity-utils/).
 
 ## Contributing
 
-Send patches to linux-fscrypt@vger.kernel.org with the additional tag
+Send patches to fsverity@lists.linux.dev with the additional tag
 `fsverity-utils` in the subject, i.e. `[fsverity-utils PATCH]`.
 Patches should follow the Linux kernel's coding style.  A
 `.clang-format` file is provided to approximate this coding style;
