@@ -209,7 +209,7 @@ Options accepted by **fsverity sign**:
 
 For example commands and more information, see the
 [README file for
-fsverity-utils](https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/fsverity-utils.git/tree/README.md).
+fsverity-utils](https://git.kernel.org/pub/scm/fs/fsverity/fsverity-utils.git/tree/README.md).
 
 Also see the [kernel documentation for
 fs-verity](https://www.kernel.org/doc/html/latest/filesystems/fsverity.html).
