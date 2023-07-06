@@ -49,11 +49,16 @@ Options accepted by **fsverity digest**:
 
 **\-\-block-size**=*BLOCK_SIZE*
 :   The Merkle tree block size (in bytes) to use.  This must be a power of 2 and
-    at least twice the size of the hash values.  However, note that currently
-    (as of Linux kernel v5.13), the Linux kernel implementations of fs-verity
-    only support the case where the Merkle tree block size is equal to the
-    system page size, usually 4096 bytes.  The default value of this option is
-    4096.
+    at least twice the size of the hash values.
+
+    Note that the Linux kernel implementations of fs-verity place further
+    restrictions on the Merkle tree block size.  Linux v6.2 and earlier require
+    that the Merkle tree block size be equal to both the system page size and
+    the filesystem block size.  These values are often 4096.  Linux v6.3 and
+    later are more flexible; they require that the Merkle tree block size be a
+    power of 2 that is greater than or equal to 1024 and less than or equal to
+    the system page size and the filesystem block size.  The default value of
+    this option is 4096.
 
 **\-\-compact**
 :   When printing the file digest, only print the actual digest hex string;
