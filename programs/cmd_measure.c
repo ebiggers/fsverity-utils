@@ -12,7 +12,12 @@
 #include "fsverity.h"
 
 #include <fcntl.h>
+#include <getopt.h>
 #include <sys/ioctl.h>
+
+static const struct option longopts[] = {
+	{NULL, 0, NULL, 0}
+};
 
 /* Display the fs-verity digest of the given verity file(s). */
 int fsverity_cmd_measure(const struct fsverity_command *cmd,
@@ -26,12 +31,22 @@ int fsverity_cmd_measure(const struct fsverity_command *cmd,
 	int status;
 	int i;
 
-	if (argc < 2)
+	/*
+	 * No supported options, but run getopt_long() with an empty longopts
+	 * array so that any options are rejected and "--" works as expected.
+	 */
+	if (getopt_long(argc, argv, "", longopts, NULL) != -1)
+		goto out_usage;
+
+	argv += optind;
+	argc -= optind;
+
+	if (argc < 1)
 		goto out_usage;
 
 	d = xzalloc(sizeof(*d) + FS_VERITY_MAX_DIGEST_SIZE);
 
-	for (i = 1; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		d->digest_size = FS_VERITY_MAX_DIGEST_SIZE;
 
 		if (!open_file(&file, argv[i], O_RDONLY, 0))
