@@ -70,7 +70,6 @@ QUIET_CCLD      = @echo '  CCLD    ' $@;
 QUIET_AR        = @echo '  AR      ' $@;
 QUIET_LN        = @echo '  LN      ' $@;
 QUIET_GEN       = @echo '  GEN     ' $@;
-QUIET_PANDOC    = @echo '  PANDOC  ' $@;
 endif
 USE_SHARED_LIB  ?=
 PREFIX          ?= /usr/local
@@ -205,11 +204,7 @@ EXTRA_TARGETS += $(TEST_PROGRAMS)
 
 #### Manual pages
 
-man/fsverity.1:man/fsverity.1.md
-	$(QUIET_PANDOC) pandoc $+ -s -t man > $@
-
-MAN_PAGES := man/fsverity.1
-EXTRA_TARGETS += $(MAN_PAGES)
+MAN_PAGES := $(wildcard man/*.[1-9])
 
 ##############################################################################
 
@@ -228,8 +223,7 @@ boringssl:
 
 ##############################################################################
 
-SPECIAL_TARGETS := all test_programs check install install-man uninstall \
-		   help clean
+SPECIAL_TARGETS := all test_programs check install uninstall help clean
 
 FORCE:
 
@@ -272,10 +266,10 @@ install:all
 		lib/libfsverity.pc.in \
 		> $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/libfsverity.pc
-
-install-man:$(MAN_PAGES)
 	install -d $(DESTDIR)$(MANDIR)/man1
-	install -m644 $+ $(DESTDIR)$(MANDIR)/man1/
+	for page in $(MAN_PAGES); do \
+		install -m644 $$page $(DESTDIR)$(MANDIR)/man1/; \
+	done
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(FSVERITY)

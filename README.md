@@ -25,7 +25,6 @@ example, on Debian-based systems, run:
 
 ```bash
     sudo apt-get install libssl-dev
-    sudo apt-get install pandoc  # optional
 ```
 
 OpenSSL must be version 1.0.0 or later.  This is the only runtime dependency.
@@ -35,16 +34,13 @@ Then, to build and install fsverity-utils:
 ```bash
     make
     sudo make install
-    sudo make install-man  # optional
 ```
 
 By default, the following targets are built and installed: the program
-`fsverity`, the static library `libfsverity.a`, and the shared library
-`libfsverity.so`.  You can also run `make check` to build and run the
-tests, or `make help` to display all available build targets.
-
-`make install-man` installs the `fsverity.1` manual page.  This step requires
-that `pandoc` be installed.
+`fsverity`, the static library `libfsverity.a`, the shared library
+`libfsverity.so`, and the manual page `fsverity.1`.  You can also run
+`make check` to build and run the tests, or `make help` to display all
+available build targets.
 
 By default, `fsverity` is statically linked to `libfsverity`.  You can
 use `make USE_SHARED_LIB=1` to use dynamic linking instead.
