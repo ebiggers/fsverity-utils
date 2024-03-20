@@ -4,7 +4,7 @@ includedir=@INCDIR@
 
 Name: libfsverity
 Description: fs-verity library
-Version: 1.5
+Version: 1.6
 Libs: -L${libdir} -lfsverity
 Requires.private: libcrypto
 Cflags: -I${includedir}

@@ -1,5 +1,22 @@
 # fsverity-utils release notes
 
+## Version 1.6
+
+* Eliminated the dependency on `pandoc` for installing the manual page.
+
+* Updated the documentation to reflect recent kernel changes, including the
+  kernel adding support for more Merkle tree block sizes, IMA adding support for
+  fs-verity, and btrfs adding support for fs-verity.
+
+* Updated the documentation to refer to the new fsverity mailing list.
+
+* Fixed a C++ compatibility issue in `libfsverity.h`.
+
+* `fsverity measure` now follows standard command line syntax for arguments
+  beginning with hyphens.  I.e., `fsverity measure --foo` now treats `--foo` as
+  an (unsupported) option, not a filename.  To operate on a file actually named
+  `--foo`, use `fsverity measure -- --foo`.
+
 ## Version 1.5
 
 * Made the `fsverity sign` command and the `libfsverity_sign_digest()` function
