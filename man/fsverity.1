@@ -209,8 +209,8 @@ To use a key file, provide \f[B]--key\f[R] and optionally \f[B]--cert\f[R].
 To use a PKCS#11 token, provide \f[B]--pkcs11-engine\f[R],
 \f[B]--pkcs11-module\f[R], \f[B]--cert\f[R], and optionally
 \f[B]--pkcs11-keyid\f[R].
-PKCS#11 token support is unavailable when fsverity-utils was built with
-BoringSSL rather than OpenSSL.
+PKCS#11 token support is unavailable if fsverity-utils was built with a version
+of OpenSSL that does not support PKCS#11 tokens.
 .PP
 \f[B]fsverity sign\f[R] should only be used if you need compatibility with
 fs-verity built-in signatures.

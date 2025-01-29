@@ -221,15 +221,6 @@ out:
 	return err;
 }
 
-static int
-load_pkcs11_private_key(const struct libfsverity_signature_params *sig_params
-			__attribute__((unused)),
-			EVP_PKEY **pkey_ret __attribute__((unused)))
-{
-	libfsverity_error_msg("BoringSSL doesn't support PKCS#11 tokens");
-	return -EINVAL;
-}
-
 #else /* OPENSSL_IS_BORINGSSL */
 
 static BIO *new_mem_buf(const void *buf, size_t size)
@@ -333,6 +324,18 @@ out:
 	return err;
 }
 
+#endif /* !OPENSSL_IS_BORINGSSL */
+
+#ifdef OPENSSL_NO_ENGINE
+static int
+load_pkcs11_private_key(const struct libfsverity_signature_params *sig_params
+			__attribute__((unused)),
+			EVP_PKEY **pkey_ret __attribute__((unused)))
+{
+	libfsverity_error_msg("libfsverity was linked to a version of OpenSSL that doesn't support PKCS#11 tokens");
+	return -EINVAL;
+}
+#else
 static int
 load_pkcs11_private_key(const struct libfsverity_signature_params *sig_params,
 			EVP_PKEY **pkey_ret)
@@ -375,8 +378,7 @@ load_pkcs11_private_key(const struct libfsverity_signature_params *sig_params,
 	}
 	return 0;
 }
-
-#endif /* !OPENSSL_IS_BORINGSSL */
+#endif
 
 /* Get a private key, either from disk or from a PKCS#11 token. */
 static int
