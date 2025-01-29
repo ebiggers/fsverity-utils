@@ -90,8 +90,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y clang llvm
-    - name: Work around https://github.com/actions/runner-images/issues/9491
-      run: sudo sysctl vm.mmap_rnd_bits=28
     - run: scripts/run-tests.sh sanitizers
 
   valgrind-test:
