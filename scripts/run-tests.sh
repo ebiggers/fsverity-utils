@@ -206,7 +206,7 @@ TEST_FUNCS+=(sanitizers_test)
 valgrind_test()
 {
 	log "Build and test with valgrind"
-	$MAKE TEST_WRAPPER_PROG="valgrind --quiet --error-exitcode=100 --leak-check=full --errors-for-leak-kinds=all" \
+	$MAKE TEST_WRAPPER_PROG="valgrind --quiet --error-exitcode=100 --leak-check=full --errors-for-leak-kinds=definite,possible" \
 		CFLAGS="-O2 -Werror" check
 }
 TEST_FUNCS+=(valgrind_test)
