@@ -1,5 +1,10 @@
 # fsverity-utils release notes
 
+## Version 1.7
+
+* Allowed fsverity-utils to build when PKCS#11 support is not available in
+  OpenSSL.  In that case, `fsverity sign` just won't support that feature.
+
 ## Version 1.6
 
 * Eliminated the dependency on `pandoc` for installing the manual page.
