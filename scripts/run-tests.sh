@@ -217,7 +217,8 @@ boringssl_test()
 	log "-> Building BoringSSL"
 	$MAKE boringssl
 	log "-> Building fsverity-utils linked to BoringSSL"
-	$MAKE CFLAGS="-O2 -Werror" LDFLAGS="-Lboringssl/build/crypto" \
+	$MAKE CFLAGS="-O2 -Werror" \
+		LDFLAGS="-Lboringssl/build -Wl,-rpath=$PWD/boringssl/build" \
 		CPPFLAGS="-Iboringssl/include" LDLIBS="-lcrypto -lpthread" check
 }
 TEST_FUNCS+=(boringssl_test)

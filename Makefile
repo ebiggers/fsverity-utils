@@ -218,7 +218,9 @@ boringssl:
 		https://boringssl.googlesource.com/boringssl/+archive/refs/heads/master.tar.gz
 	mkdir boringssl
 	tar xf boringssl.tar.gz -C boringssl
-	cmake -B boringssl/build boringssl
+	# BoringSSL is now C++, so build it as a shared library to avoid link
+	# issues with C programs.
+	cmake -B boringssl/build -D BUILD_SHARED_LIBS=1 boringssl
 	$(MAKE) -C boringssl/build $(MAKEFLAGS)
 
 ##############################################################################
