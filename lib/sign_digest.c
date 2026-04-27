@@ -19,7 +19,7 @@
 #include <openssl/pkcs7.h>
 #include <string.h>
 
-#ifndef OPENSSL_IS_BORINGSSL
+#ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif
 
